@@ -103,6 +103,6 @@ Blueprint fonctionne d'InDesign CS6 à 2026, sans dépendance externe — un seu
 
 <div align="center">
 
-Fait pour la risographie et la sérigraphie.
+Fait pour la risographie, la sérigraphie et l'édition en générale.
 
 </div>
