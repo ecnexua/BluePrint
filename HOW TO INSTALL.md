@@ -35,9 +35,9 @@ A VOUS DE JOUER !
 
 2• MOVE the file to:
 
-`MacOS`         ```/Applications/Adobe InDesign 20XX/Scripts/Script Panels```
+`MacOS`         `/Applications/Adobe InDesign 20XX/Scripts/Script Panels`
 
-`Windows`      ```C:/Program Files/Adobe/Adobe InDesign 20XX/Script/ Script Panels``` 
+`Windows`       `C:/Program Files/Adobe/Adobe InDesign 20XX/Script/Script Panels`
 
 PLEASE NOTE: 20XX MUST MATCH THE YEAR OF YOUR INDESIGN VERSION.
 
@@ -61,9 +61,9 @@ NOW IT’S YOUR TURN!
 
 2• SPOSTA il file in:
 
-`MacOS`         ```/Applications/Adobe InDesign 20XX/Scripts/Script Panels```
+`MacOS`         `/Applications/Adobe InDesign 20XX/Scripts/Script Panels`
 
-`Windows`      ```C:/Program Files/Adobe/Adobe InDesign 20XX/Script/ Script Panels``` 
+`Windows`       `C:/Program Files/Adobe/Adobe InDesign 20XX/Script/Script Panels`
 
 ATTENZIONE: 20XX DEVE CORRISPONDERE ALL’ANNO DELLA TUA VERSIONE DI INDESIGN.
 
