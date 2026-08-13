@@ -4,7 +4,7 @@
 
 **Imposition automatique + repères de coupe pour InDesign**
 
-Un script ExtendScript pensé pour la risographie et la sérigraphie — imposez, ajoutez vos repères, générez vos films de séparation, sans quitter InDesign.
+Un script ExtendScript pensé pour la risographie, la sérigraphie et l'édition en générale. Imposez, ajoutez vos repères, générez vos films de séparation, sans quitter InDesign.
 
 `InDesign CS6 → 2026` · `ExtendScript (.jsx)` · `FR / EN / IT`
 
@@ -12,11 +12,10 @@ Un script ExtendScript pensé pour la risographie et la sérigraphie — imposez
 
 ---
 
-## Pourquoi Blueprint
-
-Imposer une pièce à la main dans InDesign — grille, marges, repères de coupe, mires, fond perdu, films de séparation — est répétitif et source d'erreurs, surtout en risographie et sérigraphie où chaque encre doit sortir sur son propre film, parfaitement calé.
-
+Imposer une pièce à la main dans InDesign (grille, marges, repères de coupe, mires, fond perdu, films de séparation) est répétitif et source d'erreurs, surtout en risographie et sérigraphie où chaque encre doit sortir sur son propre film, parfaitement calé.
 Blueprint automatise l'ensemble du flux en un seul dialogue : configurez, prévisualisez en direct, lancez.
+
+---
 
 ## Fonctionnalités
 
@@ -30,7 +29,7 @@ Blueprint automatise l'ensemble du flux en un seul dialogue : configurez, prévi
 
 **Marges & fond perdu**
 - Blanc tournant (marge intérieure uniforme)
-- Fond perdu plat ou adapté au visuel (bords en miroir fondu — voir plus bas)
+- Fond perdu plat ou adapté au visuel (bords en miroir fondu voir plus bas)
 
 **Duplex**
 - Génération automatique du verso à partir du recto, retournement court ou long
@@ -57,7 +56,7 @@ Blueprint automatise l'ensemble du flux en un seul dialogue : configurez, prévi
 2. Lancez le script
 3. Choisissez le mode d'imposition, la grille, les marges et le fond perdu
 4. Vérifiez l'aperçu en direct
-5. Lancez — Blueprint pose les copies, ajoute repères et marques, génère le verso si besoin
+5. Lancez Blueprint pose les copies, ajoute repères et marques, génère le verso si besoin
 6. Exportez les films de séparation depuis le panneau dédié
 
 ## Modes d'imposition
@@ -78,13 +77,15 @@ Blueprint automatise l'ensemble du flux en un seul dialogue : configurez, prévi
 
 Plutôt qu'un aplat de couleur unique, Blueprint peut prolonger chaque bord de la pièce par une fine tranche du bord, réfléchie en miroir puis étirée sur toute la largeur du fond perdu. Résultat : les couleurs se fondent en dégradé, aucun dessin lisible dans la chute, et le raccord au trait de coupe reste exact quel que soit l'étirement.
 
-## Export des films
+### Export des films
 
 Chaque encre est exportée en PDF séparé, nommé automatiquement selon le document et la couleur. Le champ de nommage est éditable avec aperçu en direct du résultat.
 
 ## Compatibilité
 
-Blueprint fonctionne d'InDesign CS6 à 2026, sans dépendance externe — un seul fichier `.jsx` à installer.
+Blueprint fonctionne d'InDesign CS6 à 2026, sans dépendance externe un seul fichier `.jsx` à installer.
+
+`Théorique, n'a pas été testé sur d'autres versions que celle de 2026`
 
 ---
 
