@@ -10,6 +10,7 @@ BLUEPRINT
   2• DÉPLACER le fichier dans:
   
     /Applications/Adobe InDesign 20XX/Scripts/Script Panels (MacOS)
+
     C:/Program Files/Adobe/Adobe InDesign 20XX/Script/ Script Panels (Windows)
 
   ATTENTION. 20XX DOIT ÊTRE L'ANNÉE DE VOTRE INDESIGN.
@@ -34,8 +35,9 @@ A VOUS DE JOUER !
 
 2• MOVE the file to:
 
-/Applications/Adobe InDesign 20XX/Scripts/Script Panels (MacOS)
-C:/Program Files/Adobe/Adobe InDesign 20XX/Scripts/Script Panels (Windows)
+    /Applications/Adobe InDesign 20XX/Scripts/Script Panels (MacOS)
+
+    C:/Program Files/Adobe/Adobe InDesign 20XX/Script/ Script Panels (Windows)
 
 PLEASE NOTE: 20XX MUST MATCH THE YEAR OF YOUR INDESIGN VERSION.
 
@@ -59,8 +61,9 @@ NOW IT’S YOUR TURN!
 
 2• SPOSTA il file in:
 
-/Applications/Adobe InDesign 20XX/Scripts/Script Panels (MacOS)
-C:/Program Files/Adobe/Adobe InDesign 20XX/Scripts/Script Panels (Windows)
+    /Applications/Adobe InDesign 20XX/Scripts/Script Panels (MacOS)
+
+    C:/Program Files/Adobe/Adobe InDesign 20XX/Script/ Script Panels (Windows)
 
 ATTENZIONE: 20XX DEVE CORRISPONDERE ALL’ANNO DELLA TUA VERSIONE DI INDESIGN.
 
