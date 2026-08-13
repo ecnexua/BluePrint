@@ -12,19 +12,6 @@ Un script ExtendScript pensé pour la risographie et la sérigraphie — imposez
 
 ---
 
-## Sommaire
-
-- [Pourquoi Blueprint](#pourquoi-blueprint)
-- [Fonctionnalités](#fonctionnalités)
-- [Installation](#installation)
-- [Utilisation](#utilisation)
-- [Modes d'imposition](#modes-dimposition)
-- [Fond perdu adapté au visuel](#fond-perdu-adapté-au-visuel)
-- [Export des films](#export-des-films)
-- [Compatibilité](#compatibilité)
-
----
-
 ## Pourquoi Blueprint
 
 Imposer une pièce à la main dans InDesign — grille, marges, repères de coupe, mires, fond perdu, films de séparation — est répétitif et source d'erreurs, surtout en risographie et sérigraphie où chaque encre doit sortir sur son propre film, parfaitement calé.
