@@ -21,9 +21,9 @@ Un script ExtendScript pensé pour la risographie, la sérigraphie et l'édition
   
   2• DÉPLACER le fichier dans:
  
-`MacOS`         ```/Applications/Adobe InDesign 20XX/Scripts/Script Panels```
+`MacOS`         ```/Applications/Adobe InDesign 20XX/Scripts/Scripts Panel```
 
-`Windows`      ```C:/Program Files/Adobe/Adobe InDesign 20XX/Script/ Script Panels``` 
+`Windows`      ```C:\Program Files\Adobe\Adobe InDesign 20XX\Scripts\Scripts Panel``` 
 
   ATTENTION. 20XX DOIT ÊTRE L'ANNÉE DE VOTRE INDESIGN.
 
@@ -33,7 +33,7 @@ Un script ExtendScript pensé pour la risographie, la sérigraphie et l'édition
 
   2• Dans le PANNEAU SCRIPT dérouler APPLICATION
 
-  3• DOUBLE CLIQUER sur BLUEPRINT.JSX
+  3• DOUBLE CLIQUER sur BLUEPRINT.v2.jsx
 
 A VOUS DE JOUER !
 
@@ -46,9 +46,9 @@ A VOUS DE JOUER !
 
 2• MOVE the file to:
 
-`MacOS`         `/Applications/Adobe InDesign 20XX/Scripts/Script Panels`
+`MacOS`         `/Applications/Adobe InDesign 20XX/Scripts/Scripts Panel`
 
-`Windows`       `C:/Program Files/Adobe/Adobe InDesign 20XX/Script/Script Panels`
+`Windows`       `C:\Program Files\Adobe\Adobe InDesign 20XX\Scripts\Scripts Panel`
 
 PLEASE NOTE: 20XX MUST MATCH THE YEAR OF YOUR INDESIGN VERSION.
 
@@ -58,7 +58,7 @@ PLEASE NOTE: 20XX MUST MATCH THE YEAR OF YOUR INDESIGN VERSION.
 
 2• In the Scripts panel, expand Application
 
-3• DOUBLE-CLICK on BLUEPRINT.JSX
+3• DOUBLE-CLICK on BLUEPRINT.v2.jsx
 
 NOW IT’S YOUR TURN!
 
@@ -71,9 +71,9 @@ NOW IT’S YOUR TURN!
 
 2• SPOSTA il file in:
 
-`MacOS`         `/Applications/Adobe InDesign 20XX/Scripts/Script Panels`
+`MacOS`         `/Applications/Adobe InDesign 20XX/Scripts/Scripts Panel`
 
-`Windows`       `C:/Program Files/Adobe/Adobe InDesign 20XX/Script/Script Panels`
+`Windows`       `C:\Program Files\Adobe\Adobe InDesign 20XX\Scripts\Scripts Panel`
 
 ATTENZIONE: 20XX DEVE CORRISPONDERE ALL’ANNO DELLA TUA VERSIONE DI INDESIGN.
 
@@ -83,6 +83,6 @@ ATTENZIONE: 20XX DEVE CORRISPONDERE ALL’ANNO DELLA TUA VERSIONE DI INDESIGN.
 
 2• Nel pannello Script, espandi Applicazione
 
-3• FAI DOPPIO CLIC su BLUEPRINT.JSX
+3• FAI DOPPIO CLIC su BLUEPRINT.v2.jsx
 
 ORA TOCCA A TE!

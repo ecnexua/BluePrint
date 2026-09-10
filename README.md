@@ -19,6 +19,11 @@ Blueprint automatise l'ensemble du flux en un seul dialogue : configurez, prévi
 
 ## Fonctionnalités
 
+**Vous choisissez un type de document, pas un mode d'imposition**
+- Carte de visite, Flyer / carton, Affiche, Sticker / étiquette, Fanzine / livret
+- Le type décide de l'imposition, pose les valeurs de départ et n'affiche que les réglages qui le concernent : une affiche n'a ni répétition, ni espacement, ni recto/verso
+- Le type **Personnalisé** rend les 9 modes et tous les panneaux accessibles
+
 **Imposition**
 - 9 modes de pose : N-Up, Step & Repeat, Cut & Stack, Booklet, Dutch Cut, Shuffle, Riso, Sérigraphie, Patchwork
 - Aperçu en direct, calcul automatique des espacements
@@ -43,21 +48,25 @@ Blueprint automatise l'ensemble du flux en un seul dialogue : configurez, prévi
 
 ## Installation
 
-1. Téléchargez `Blueprint_V1.jsx`
-2. Placez le fichier dans le dossier Scripts d'InDesign :
-   - **macOS** : `~/Library/Preferences/Adobe InDesign/[version]/[langue]/Scripts/Scripts Panel/`
-   - **Windows** : `%APPDATA%\Adobe\InDesign\[version]\[langue]\Scripts\Scripts Panel\`
+1. Téléchargez `BLUEPRINT.v2.jsx`
+2. Placez le fichier dans un dossier `Scripts Panel` d'InDesign :
+   - **macOS** : `/Applications/Adobe InDesign 20XX/Scripts/Scripts Panel/`
+   - **Windows** : `C:\Program Files\Adobe\Adobe InDesign 20XX\Scripts\Scripts Panel\`
+
+   `20XX` doit être l'année de votre version d'InDesign. Le script apparaîtra alors sous **Application** dans le panneau Scripts. Pour l'installer pour votre seul compte (il apparaît sous **Utilisateur**), utilisez plutôt `~/Library/Preferences/Adobe InDesign/Version XX.0/[langue]/Scripts/Scripts Panel/` sur macOS, `%APPDATA%\Adobe\InDesign\Version XX.0\[langue]\Scripts\Scripts Panel\` sur Windows.
 3. Dans InDesign : `Fenêtre > Utilitaires > Scripts`
-4. Double-cliquez sur `Blueprint_V1.jsx` pour lancer l'interface
+4. Double-cliquez sur `BLUEPRINT.v2.jsx` pour lancer l'interface
 
 ## Utilisation
 
 1. Sélectionnez la ou les pièces à imposer dans le document
 2. Lancez le script
-3. Choisissez le mode d'imposition, la grille, les marges et le fond perdu
-4. Vérifiez l'aperçu en direct
-5. Lancez Blueprint pose les copies, ajoute repères et marques, génère le verso si besoin
+3. Choisissez le **type de document** — l'imposition et les valeurs de départ en découlent
+4. Ajustez la grille, les marges et le fond perdu ; vérifiez l'aperçu en direct
+5. Lancez : Blueprint pose les copies, ajoute repères et marques, génère le verso si besoin
 6. Exportez les films de séparation depuis le panneau dédié
+
+Le sélecteur de type est posé au-dessus des onglets parce qu'il les gouverne tous. En dessous : **Composition** (destination, grille, alignement), **Marges** (espacement, fond perdu, blanc tournant), **Repères**, **Recto/verso** et **Presets**. Une barre d'état sous la fenêtre indique en permanence si la planche est réalisable, et sinon pourquoi — le bouton Lancer reste désactivé tant qu'elle ne l'est pas.
 
 ## Modes d'imposition
 
