@@ -11,6 +11,45 @@
 //  HISTORIQUE DES VERSIONS
 //  ─────────────────────────────────────────────────────────
 //  v2  (ergonomie de l'interface — le MOTEUR est inchangé)
+//    Filtrage FIN par type de document
+//      • Le masquage descend désormais à la RANGÉE, plus au panneau. Le
+//        masquage par panneau avait un défaut de fond : il privait le
+//        FANZINE de sa gouttière centrale. Vérification faite dans
+//        addBookletImposition, le moteur lit `gapH` comme l'écart entre les
+//        deux pages du couple — un réglage indispensable, qui vivait dans le
+//        panneau « Espacement » masqué en bloc.
+//      • Le champ est en outre RENOMMÉ selon le contexte : « Espacement
+//        horizontal » dans les autres types, « Gouttière centrale » en livret.
+//        Même champ, autre sens, autre libellé.
+//      • Ce que le moteur IGNORE en livret est maintenant masqué : nombre de
+//        copies, tête-bêche, rotation des copies, espacement vertical
+//        (L.cols/L.rows y sont forcés à 2×1). Les afficher laissait croire
+//        qu'ils agissaient.
+//      • NEUTRALISATION : un réglage masqué ne produit plus rien. La fonction
+//        `neutralize` de chaque type s'exécute à CHAQUE application, y compris
+//        au chargement d'un preset — sans quoi un preset pouvait faire agir en
+//        douce un réglage que l'écran ne montrait plus (un verso sur un
+//        sticker, une répétition sur une affiche).
+//      • Un panneau dont toutes les rangées sont masquées se replie au lieu de
+//        rester à l'écran en cadre vide.
+//    Correction d'un AVERTISSEMENT FAUX
+//      • Le panneau « Pré-traitement des pages » annonçait modifier le
+//        document. C'est inexact : iwExecute calcule bien un plan de pages à
+//        partir de ces champs (ppReorder / ppClone / ppDeletePage /
+//        ppDuplicatePage), puis la variable `plan` n'est JAMAIS relue —
+//        baseCfg ne la référence pas. Ces champs ne produisent rien. Le
+//        panneau le dit désormais, au lieu de laisser craindre une suppression
+//        de pages qui n'a pas lieu.
+//    Aspect « panneau InDesign »
+//      • ScriptUI ne permet pas de redessiner les contrôles natifs. Les trois
+//        leviers réellement disponibles sont exploités, en une passe qui
+//        parcourt tout l'arbre de la fenêtre : corps de police ramené à 11 pt
+//        (celui de l'interface d'InDesign, contre 13 pt par défaut sur macOS),
+//        densité resserrée (marges 6 px, gouttières 4 px), et bleu de
+//        SÉLECTION d'InDesign pour l'état actif des panneaux dessinés.
+//      • Les textes d'aide gardent l'italique un corps en dessous : au même
+//        corps que les libellés, ils cesseraient de se lire comme du
+//        commentaire.
 //    Interface pilotée par le TYPE DE DOCUMENT
 //      • Blueprint demandait d'abord un MODE D'IMPOSITION — N-Up, Cut & Stack,
 //        Dutch Cut, Shuffle, Step & Repeat… — c'est-à-dire le vocabulaire du
@@ -1315,6 +1354,13 @@ var I18N = {
     // labels supplémentaires V5
     cb_pagecross2:    { fr: "    ↳ Croix centrale",             en: "    ↳ Center cross",              it: "    ↳ Croce centrale" },
     lbl_gapH2:        { fr: "Horizontal (mm) :",               en: "Horizontal (mm):",                it: "Orizzontale (mm):" },
+    // V2 — en mode Livret, ce MÊME champ sert de gouttière centrale : le
+    //   moteur (addBookletImposition) lit gapH comme l'écart entre les deux
+    //   pages du couple, pas comme un espacement de grille.
+    lbl_gutter:       { fr: "Gouttière centrale (mm) :",       en: "Center gutter (mm):",             it: "Margine interno centrale (mm):" },
+    tip_gutter:       { fr: "Écart entre les deux pages du couple, à l'endroit du pli. C'est le même champ que l'espacement horizontal, mais en imposition de livret le moteur s'en sert comme gouttière.",
+                        en: "Gap between the two pages of the pair, at the fold. It is the same field as horizontal spacing, but in booklet imposition the engine uses it as the gutter.",
+                        it: "Distanza tra le due pagine della coppia, in corrispondenza della piega. È lo stesso campo della spaziatura orizzontale, ma nell'imposizione a libretto il motore lo usa come margine interno." },
     lbl_gapV2:        { fr: "Vertical (mm) :",                 en: "Vertical (mm):",                  it: "Verticale (mm):" },
     btn_gap_auto:     { fr: "Auto (remplir la page)",          en: "Auto (fill the page)",            it: "Auto (riempi la pagina)" },
     tip_gap_auto:     { fr: "Place le MAXIMUM de pièces dans la zone utile, avec une marge de 3 mm tout autour pour que les pièces ne touchent pas les bords. L'espacement entre pièces est réparti uniformément.",
@@ -1378,9 +1424,16 @@ var I18N = {
                         it: "Filtra l'elenco mentre digiti. Una cartella resta visibile se uno dei suoi preset corrisponde." },
     preset_nomatch:   { fr: "Aucun preset ne correspond.",    en: "No preset matches.",              it: "Nessun preset corrisponde." },
     // Pré-traitement : avertissement
-    warn_preprocess:  { fr: "⚠ Ces réglages MODIFIENT le document (pages ajoutées, supprimées ou réordonnées). Laissez vide pour ne rien changer.",
-                        en: "⚠ These settings MODIFY the document (pages added, deleted or reordered). Leave empty to change nothing.",
-                        it: "⚠ Queste impostazioni MODIFICANO il documento (pagine aggiunte, eliminate o riordinate). Lascia vuoto per non cambiare nulla." },
+    // V2 — CORRECTION D'UN AVERTISSEMENT FAUX. Il annonçait que ces réglages
+    //   modifient le document. Vérification faite dans iwExecute : le plan de
+    //   pages est bien calculé à partir d'eux (ppReorder / ppClone /
+    //   ppDeletePage / ppDuplicatePage), puis la variable `plan` n'est JAMAIS
+    //   relue — baseCfg ne la référence pas. Ces champs ne produisent donc
+    //   rien du tout. Mieux vaut le dire que laisser croire à une suppression
+    //   de pages qui n'a pas lieu.
+    warn_preprocess:  { fr: "⚠ Ces réglages ne sont pas encore raccordés au moteur : le plan de pages est calculé puis ignoré. Ils n'ont aucun effet sur la planche produite.",
+                        en: "⚠ These settings are not wired to the engine yet: the page plan is computed then discarded. They have no effect on the produced sheet.",
+                        it: "⚠ Queste impostazioni non sono ancora collegate al motore: il piano pagine viene calcolato e poi ignorato. Non hanno alcun effetto sul foglio prodotto." },
     // Export des films — messages jusqu'ici en dur en français
     films_err_title:  { fr: "Export — erreur (%N%)",          en: "Export — error (%N%)",            it: "Esportazione — errore (%N%)" },
     films_err_intro:  { fr: "Message (copiez-le pour le signaler) :",
@@ -6568,7 +6621,10 @@ function mainV2(initialConfig) {
         var W = this.size[0], H = this.size[1];
         var cw = (W - IW_ALIGN_PAD * 2) / 3, ch = (H - IW_ALIGN_PAD * 2) / 3;
         var lineCol = IW_UI_DARK ? [0.55, 0.57, 0.62, 1] : [0.45, 0.47, 0.52, 1];
-        var activeCol = [0.13, 0.40, 0.85, 1];              // bleu de marque
+        // V2 — bleu de SÉLECTION D'INDESIGN (≈ #4A8CC7), et non le bleu de
+        //   marque de Blueprint : dans un panneau, l'état actif doit parler la
+        //   même langue que le reste de l'application.
+        var activeCol = [0.29, 0.55, 0.78, 1];
         var hoverCol = IW_UI_DARK ? [1, 1, 1, 0.14] : [0, 0, 0, 0.08];
         for (var r = 0; r < 3; r++) {
             for (var c = 0; c < 3; c++) {
@@ -8244,10 +8300,22 @@ function mainV2(initialConfig) {
         fitCb.value = false; flipAltCb.value = false;
     }
 
+    // ── NEUTRALISATION ──────────────────────────────────────────────────
+    //  RÈGLE : un réglage MASQUÉ ne doit plus rien produire. Sinon un preset
+    //  chargé peut faire agir, en douce, un réglage que l'écran ne montre
+    //  plus — exactement le défaut que la V2 s'emploie à supprimer partout
+    //  ailleurs. `neutralize` s'exécute donc à CHAQUE application de type,
+    //  y compris au chargement d'un preset, et pas seulement sur les défauts.
+    function dtClearPre() {
+        ppReorderIn.text = ""; setNum(ppCloneIn, 1);
+        ppDelIn.text = ""; ppDupPg.text = ""; setNum(ppDupN, 1);
+    }
+
     var IW_DOCTYPES = [
         {   // 0 — CARTE DE VISITE : grille serrée, coupes partagées (gap 0).
             key: "card", mode: 0, desc: "desc_dt_card",
             hide: ["pModeOpts", "pPre"],
+            neutralize: function () { shufIn.text = ""; dtClearPre(); },
             setup: function () {
                 dtRepeat(true); dtGaps(0, 0); dtEdge("bleed", 3);
                 currentAlign = "CC"; origRotation = 0;
@@ -8260,6 +8328,7 @@ function mainV2(initialConfig) {
             //     les poses (pas de coupe partagée sur un format qu'on manipule).
             key: "flyer", mode: 0, desc: "desc_dt_flyer",
             hide: ["pModeOpts", "pPre"],
+            neutralize: function () { shufIn.text = ""; dtClearPre(); },
             setup: function () {
                 dtRepeat(true); dtGaps(5, 5); dtEdge("bleed", 3);
                 currentAlign = "CC"; origRotation = 0;
@@ -8271,59 +8340,96 @@ function mainV2(initialConfig) {
         {   // 2 — AFFICHE : UNE pose. Ni répétition, ni espacement, ni verso.
             //     En revanche mires de calage et marques couleurs comptent :
             //     c'est là que se joue le repérage des encres.
+            //     La rotation reste offerte : une affiche portrait sur une
+            //     feuille paysage se tourne d'un quart, c'est un cas courant.
             key: "poster", mode: 0, desc: "desc_dt_poster",
             hide: ["pRep", "pGaps", "pModeOpts", "pDupx", "pPre"],
+            neutralize: function () {
+                // une seule pose : répétition, tête-bêche et espacement n'ont
+                // aucun sens et ne doivent pas subsister depuis un preset.
+                autoCb.value = false; countIn.enabled = true; setNum(countIn, 1);
+                flipAltCb.value = false;
+                dtGaps(0, 0);
+                dupCb.value = false;
+                shufIn.text = ""; dtClearPre();
+            },
             setup: function () {
                 dtRepeat(false, 1); dtGaps(0, 0); dtEdge("bleed", 3);
                 currentAlign = "CC"; origRotation = 0;
                 dtMarks({ crop: true, reg: true, pageCenter: true, pageCross: true, colorMarks: true });
                 setNum(mLenIn, 7); setNum(mGapIn, 2); setNum(mWIn, 0.25);
-                dupCb.value = false;
             }
         },
         {   // 3 — STICKER / ÉTIQUETTE : Step & Repeat, avec le jeu nécessaire
             //     au passage de la lame ou du massicot entre les poses.
             key: "sticker", mode: 1, desc: "desc_dt_sticker",
             hide: ["pModeOpts", "pDupx", "pPre"],   // onglet Recto/verso vide -> dupNA
-
+            neutralize: function () {
+                dupCb.value = false;               // un sticker n'a pas de verso
+                shufIn.text = ""; dtClearPre();
+            },
             setup: function () {
                 dtRepeat(true); dtGaps(2, 2); dtEdge("bleed", 3);
                 currentAlign = "CC"; origRotation = 0;
                 dtMarks({ crop: true, pageCross: true });
                 setNum(mLenIn, 5); setNum(mGapIn, 1.5); setNum(mWIn, 0.25);
-                dupCb.value = false;
             }
         },
-        {   // 4 — FANZINE / LIVRET : appariement des pages. Le pré-traitement
-            //     (réordonner, dupliquer, supprimer une page) est ici utile, à
-            //     la différence des types à pose unique.
+        {   // 4 — FANZINE / LIVRET : appariement des pages pour le pliage.
+            //     Ce que le MOTEUR lit réellement en mode Booklet (vérifié dans
+            //     iwComputeLayout et addBookletImposition) :
+            //       • gapH  -> GOUTTIÈRE CENTRALE entre les deux pages : à garder,
+            //                  et renommée en conséquence pour ce type ;
+            //       • align -> utilisé (placement du couple sur la feuille) ;
+            //       • fit   -> utilisé (iwFitDims) ;
+            //       • gapV, nombre de copies, tête-bêche, rotation des copies
+            //                -> IGNORÉS : L.cols/L.rows sont forcés à 2×1. Les
+            //                   afficher laisserait croire qu'ils agissent.
             key: "zine", mode: 3, desc: "desc_dt_zine",
-            hide: ["pRep", "pGaps", "shufGrp"],
+            hide: ["repRow", "repDesc", "flipAltCb", "rotGrp", "shufGrp",
+                   "rowGapV", "gapAutoRow", "pPre"],
+            gutter: true,                          // gapH = gouttière, pas espacement
+            neutralize: function () {
+                autoCb.value = true; countIn.enabled = false;
+                flipAltCb.value = false;
+                origRotation = 0;
+                setNum(gapVIn, 0);
+                shufIn.text = ""; dtClearPre();
+            },
             setup: function () {
-                dtRepeat(true); dtGaps(0, 0); dtEdge("bleed", 3);
-                currentAlign = "CC"; origRotation = 0;
+                dtGaps(10, 0); dtEdge("bleed", 3);   // 10 mm de gouttière au départ
+                currentAlign = "CC";
                 dtMarks({ crop: true, pageCross: true });
                 setNum(mLenIn, 7); setNum(mGapIn, 2); setNum(mWIn, 0.25);
                 setNum(bkPages, Math.ceil(doc.pages.length / 4) * 4);
                 setNum(bkCreep, 0);
+                fitCb.value = false;
                 dupCb.value = true;
                 try { flipDd.selection = 0; } catch (eFz) {}   // bord long
             }
         },
         {   // 5 — PERSONNALISÉ : rien n'est masqué, le mode se choisit à la main.
             key: "custom", mode: null, desc: "desc_dt_custom",
-            hide: [], setup: null
+            hide: [], neutralize: null, setup: null
         }
     ];
 
-    // Table nom -> contrôle, pour que `hide` reste lisible dans la table.
+    // Table nom -> contrôle. Elle descend jusqu'à la RANGÉE : masquer un
+    // panneau entier privait le fanzine de sa gouttière centrale (gapH), qui
+    // vit dans le panneau « Espacement ». La granularité est donc celle du
+    // réglage, pas celle du panneau.
     var IW_DT_PANELS = {
+        // panneaux
         pRep: pRep, pAlign: pAlign, pModeOpts: pModeOpts,
         bkGrp: bkGrp, shufGrp: shufGrp,
         pGaps: pGaps, pEdge: pEdge, pBleed: pBleed, pWM: pWM,
         pPiece: pPiece, pPage: pPage, pCustom2: pCustom2, pStyle: pStyle,
         pColorMarks: pColorMarks,
-        pDupx: pDupx, pPre: pPre
+        pDupx: pDupx, pPre: pPre,
+        // rangées et contrôles isolés
+        repRow: repRow, repDesc: repDesc, fitCb: fitCb, flipAltCb: flipAltCb,
+        rotGrp: rotGrp, alignPanel: alignPanel,
+        rowGapH: gapHIn.parent, rowGapV: gapVIn.parent, gapAutoRow: gapAutoRow
     };
 
     function docTypeIndex() {
@@ -8359,8 +8465,30 @@ function mainV2(initialConfig) {
             var dupEmpty = !pDupx.visible && !pPre.visible;
             dupNA.visible = dupEmpty;
         } catch (eDn) {}
+        // Un panneau dont toutes les rangées sont masquées ne doit pas rester
+        // à l'écran sous forme de cadre vide.
+        //   Le « visible && » n'est pas décoratif : sans lui, un panneau que le
+        //   type vient EXPLICITEMENT de masquer (pRep pour l'affiche) serait
+        //   ré-affiché ici, puisque ses rangées, elles, n'ont pas été masquées
+        //   individuellement. On ne fait donc que REPLIER, jamais rouvrir.
+        try { pRep.visible = pRep.visible && (repRow.visible || fitCb.visible || flipAltCb.visible); } catch (eDe1) {}
+        try { pGaps.visible = pGaps.visible && (gapHIn.parent.visible || gapVIn.parent.visible || gapAutoRow.visible); } catch (eDe2) {}
+        try { pModeOpts.visible = pModeOpts.visible && (bkGrp.visible || shufGrp.visible); } catch (eDe3) {}
 
-        // 3. valeurs de départ
+        // 2b. LIBELLÉ CONTEXTUEL. En livret, gapH n'est pas un « espacement
+        //     horizontal » entre poses : le moteur s'en sert comme GOUTTIÈRE
+        //     CENTRALE entre les deux pages. Le même champ, un autre sens —
+        //     le libellé doit le dire, sinon le réglage est incompréhensible.
+        try {
+            gapHIn.parent.children[0].text = t.gutter ? tr("lbl_gutter") : tr("lbl_gapH2");
+            gapHIn.helpTip = t.gutter ? tr("tip_gutter") : tr("tip_gapH");
+        } catch (eDg) {}
+
+        // 3. NEUTRALISATION — avant les valeurs de départ, et TOUJOURS, même
+        //    au chargement d'un preset : ce qui est masqué ne doit plus agir.
+        if (t.neutralize) { try { t.neutralize(); } catch (eDnz) {} }
+
+        // 3b. valeurs de départ
         //    Elles ÉCRASENT les réglages courants — c'est le but d'un changement
         //    de type — mais il n'y a pas d'annulation : on le dit donc dans la
         //    barre d'état, au lieu de laisser l'utilisateur découvrir que sa
@@ -8584,6 +8712,74 @@ function mainV2(initialConfig) {
             try { applyDocType(docTypeIndex(), true); } catch (eDf) {}
         }
     }
+
+    // ══ V2 — THÈME « PANNEAU INDESIGN » ════════════════════════════════
+    //  ScriptUI ne permet pas de redessiner les contrôles natifs : on ne peut
+    //  ni arrondir un bouton, ni colorer une case à cocher. Ce qui distingue
+    //  visuellement un panneau InDesign est donc reproductible par les trois
+    //  seuls leviers disponibles :
+    //    • la TAILLE DE POLICE — l'interface d'InDesign tourne autour de 11 pt,
+    //      là où ScriptUI part sur la police système (13 pt sur macOS) ;
+    //    • la DENSITÉ — les panneaux d'InDesign sont serrés : gouttières de
+    //      3-4 px, marges de 6 px, pas les 8 px par défaut ;
+    //    • l'ACCENT — le bleu de sélection d'InDesign, repris par les
+    //      panneaux que l'on dessine soi-même (grille d'alignement, presets).
+    //  On parcourt l'arbre entier de la fenêtre plutôt que de reprendre chaque
+    //  contrôle un par un : les nouveaux contrôles hériteront du thème sans
+    //  qu'on ait à y penser.
+    var IW_ID_FONT_PT = 11;   // taille de l'interface InDesign
+    var IW_ID_MARGIN  = 6;    // marge intérieure d'un panneau
+    var IW_ID_SPACING = 4;    // gouttière entre contrôles
+
+    //  On ne change QUE la taille : le nom de police et le STYLE sont relus
+    //  sur le contrôle. C'est ce qui préserve les descriptions en italique
+    //  posées par iwItalic() — les réécrire en régulier aplatirait la
+    //  hiérarchie que ces italiques servent justement à créer.
+    function iwThemeFont(ctrl) {
+        try {
+            var f = ctrl.graphics.font;
+            if (!f) return;
+            // Les textes d'aide sont posés en ITALIQUE 10 pt par iwItalic().
+            // Les remonter à 11 les mettrait au même corps que les libellés :
+            // ils cesseraient de se lire comme du commentaire. On garde donc
+            // l'italique un cran en dessous, comme le fait InDesign.
+            var isItal = false;
+            try {
+                var st = String(f.style).toUpperCase();
+                isItal = (st.indexOf("ITALIC") >= 0);
+            } catch (eSt) {}
+            ctrl.graphics.font = ScriptUI.newFont(f.name, f.style,
+                isItal ? (IW_ID_FONT_PT - 1) : IW_ID_FONT_PT);
+        } catch (eTf) {}
+    }
+    function iwApplyIDTheme(ctrl) {
+        if (!ctrl) return;
+        try {
+            iwThemeFont(ctrl);
+            // densité : uniquement sur les conteneurs qui ont des enfants.
+            // Les panneaux DESSINÉS (aperçu, presets, grille d'alignement)
+            // n'en ont pas : leurs marges ne sont pas touchées, et c'est
+            // voulu — ils gèrent leur propre géométrie au pixel.
+            if (ctrl.children && ctrl.children.length > 0) {
+                var ty = String(ctrl.type);
+                if (ty === "panel" || ty === "tab") {
+                    try { ctrl.margins = IW_ID_MARGIN; } catch (eTm) {}
+                }
+                try { if (typeof ctrl.spacing === "number") ctrl.spacing = IW_ID_SPACING; } catch (eTs) {}
+            }
+        } catch (eTc) {}
+        try {
+            var n = (ctrl.children ? ctrl.children.length : 0);
+            for (var i = 0; i < n; i++) iwApplyIDTheme(ctrl.children[i]);
+        } catch (eTr) {}
+    }
+    try { iwApplyIDTheme(dlg); } catch (eTh2) {}
+    // la barre du bas garde un peu d'air : c'est la zone d'action, la serrer
+    // autant que les panneaux de réglage rendrait « Lancer » difficile à viser.
+    try { mainBtns.spacing = 8; } catch (eTb) {}
+    // changer polices et marges modifie les tailles voulues de tous les
+    // contrôles : sans recalcul, la fenêtre garderait la géométrie d'avant.
+    try { dlg.layout.layout(true); } catch (eTl) {}
 
     // premier rendu
     refreshAlignButtons();
