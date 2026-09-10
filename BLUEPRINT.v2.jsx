@@ -40,6 +40,25 @@
 //        baseCfg ne la référence pas. Ces champs ne produisent rien. Le
 //        panneau le dit désormais, au lieu de laisser craindre une suppression
 //        de pages qui n'a pas lieu.
+//    Disposition reprise des dialogues d'InDesign
+//      • Les onglets HORIZONTAUX d'un `tabbedpanel` ne ressemblaient à rien de
+//        ce que fait l'application. Ils sont remplacés par une LISTE DE
+//        SECTIONS en colonne à gauche — le motif d'« Imprimer le cahier »,
+//        « Imprimer » et « Exporter en PDF ». Une listbox reçoit en prime le
+//        bleu de sélection du système, comme la liste Format / Aperçu /
+//        Synthèse.
+//      • Corps de fenêtre en trois colonnes : SECTIONS | RÉGLAGES | APERÇU.
+//        Les cinq sections sont empilées (orientation « stack ») dans la
+//        colonne centrale, une seule visible à la fois.
+//      • L'APERÇU occupe toute la hauteur de la fenêtre : il n'est plus
+//        plafonné indépendamment (l'ancien plafond de 620 px laissait du vide
+//        sous lui sur un grand écran). Colonne et canvas sont en « fill »
+//        vertical, le canvas absorbant la hauteur restante.
+//      • Le TYPE DE DOCUMENT passe en tête, sur toute la largeur : il gouverne
+//        les cinq sections, sa portée doit se voir.
+//      • Garde-fou d'écran étroit : trois colonnes côte à côte élargissent la
+//        fenêtre ; la colonne des réglages se resserre en premier (jusqu'à
+//        420 px) pour que celle de droite ne sorte pas de l'écran.
 //    Aspect « panneau InDesign »
 //      • ScriptUI ne permet pas de redessiner les contrôles natifs. Les trois
 //        leviers réellement disponibles sont exploités, en une passe qui
@@ -6398,45 +6417,46 @@ function mainV2(initialConfig) {
     // hauteur max de la fenêtre = 88% de l'écran (laisse barre de menus, titre, dock)
     var IW_CONTENT_MAX_H = Math.round(IW_SCREEN_H * 0.88) - 84;   // 84 = titre + marges + boutons
     if (IW_CONTENT_MAX_H < 360) IW_CONTENT_MAX_H = 360;
-    // hauteur du canvas d'aperçu : remplit l'espace, bornée
-    var IW_PREVIEW_CHROME = 150;   // info pièce + zoom + résumé + marges autour du canvas
-    var IW_CANVAS_H = IW_CONTENT_MAX_H - IW_PREVIEW_CHROME;
+    // ── V2 — HAUTEUR DE CORPS COMMUNE ────────────────────────────────
+    //  Les trois colonnes (sections, réglages, aperçu) partagent une même
+    //  hauteur, celle du corps de la fenêtre. L'APERÇU la remplit donc
+    //  entièrement, au lieu d'être plafonné indépendamment comme avant.
+    var IW_BODY_H = IW_CONTENT_MAX_H;
+    if (IW_BODY_H < 380) IW_BODY_H = 380;
+    // hauteur du canvas d'aperçu : le corps, moins ce qui l'entoure dans sa
+    // colonne (ligne d'info pièce, deux rangées de zoom, résumé, marges).
+    var IW_PREVIEW_CHROME = 150;
+    var IW_CANVAS_H = IW_BODY_H - IW_PREVIEW_CHROME;
     if (IW_CANVAS_H < 260) IW_CANVAS_H = 260;
-    if (IW_CANVAS_H > 620) IW_CANVAS_H = 620;
-    // largeur du canvas : ~28% de la largeur écran, bornée
+    // largeur du canvas : ~35% de la largeur écran, bornée
     var IW_CANVAS_W = Math.round(IW_SCREEN_W * 0.35);
     if (IW_CANVAS_W < 300) IW_CANVAS_W = 300;
     if (IW_CANVAS_W > 700) IW_CANVAS_W = 700;
-    // plafond de hauteur des onglets (réglages) pour ne pas dépasser l'écran
-    var IW_TABS_MAX_H = IW_CONTENT_MAX_H;
+    var IW_TABS_MAX_H = IW_BODY_H;
+    var IW_NAV_W = 132;    // largeur de la colonne de sections
+    // Trois colonnes côte à côte élargissent la fenêtre : sur un écran étroit,
+    // la somme dépasserait la largeur disponible et la colonne de droite
+    // sortirait de l'écran. On rabote donc la colonne des réglages en premier
+    // — c'est elle qui supporte le mieux d'être resserrée, ses champs étant
+    // alignés sur une colonne de libellés fixe.
+    var IW_CONTENT_W = 560;
+    var _availW = IW_SCREEN_W - 60 - IW_NAV_W - IW_CANVAS_W - 40;
+    if (_availW < IW_CONTENT_W) IW_CONTENT_W = _availW;
+    if (IW_CONTENT_W < 420) IW_CONTENT_W = 420;
 
-    // Conteneur HAUT : les deux colonnes (contrôles | aperçu) côte à côte.
-    // Les boutons sont, eux, dans une barre EN BAS de la fenêtre (plus bas),
-    // donc sous l'ENSEMBLE et non sous la seule colonne gauche.
-    var topRow = dlg.add("group");
-    topRow.orientation = "row";
-    topRow.alignChildren = "top";
-    topRow.spacing = 8;
-
-    // Colonne gauche : onglets de réglages
-    var leftCol = topRow.add("group");
-    leftCol.orientation = "column";
-    leftCol.alignChildren = "fill";
-    leftCol.spacing = 6;
-    leftCol.preferredSize.width = 560;
-
-    // ══ V2 — TYPE DE DOCUMENT, AU-DESSUS DES ONGLETS ═══════════════════
-    //  Réglage de tête, placé hors des onglets parce qu'il les gouverne tous :
-    //  il choisit l'imposition, pose les valeurs de départ, et MASQUE les
-    //  panneaux qui ne concernent pas ce type de document.
+    // ══ V2 — TYPE DE DOCUMENT, EN TÊTE DE FENÊTRE ══════════════════════
+    //  Réglage de tête, placé hors des sections et sur TOUTE LA LARGEUR
+    //  parce qu'il les gouverne toutes : il choisit l'imposition, pose les
+    //  valeurs de départ, et masque les réglages qui ne concernent pas ce
+    //  type de document.
     //
     //  Pourquoi : Blueprint demandait d'abord un MODE D'IMPOSITION — N-Up,
     //  Cut & Stack, Dutch Cut, Shuffle… — c'est-à-dire le vocabulaire du
     //  façonnage, pas celui du travail. On sait qu'on fait des cartes de
     //  visite ; on ne sait pas forcément que cela s'impose en N-Up. Le mode
     //  se DÉDUIT donc du type et n'est plus demandé, sauf en « Personnalisé ».
-    var typePanel = leftCol.add("panel", undefined, tr("lbl_doctype"));
-    typePanel.orientation = "column"; typePanel.alignChildren = "fill";
+    var typePanel = dlg.add("panel", undefined, tr("lbl_doctype"));
+    typePanel.orientation = "column"; typePanel.alignChildren = "left";
     typePanel.margins = 8; typePanel.spacing = 4;
     var typeRow = typePanel.add("group");
     typeRow.orientation = "row"; typeRow.alignChildren = "center"; typeRow.spacing = IW_UI_GAP;
@@ -6449,13 +6469,57 @@ function mainV2(initialConfig) {
     typeResetBtn.preferredSize = [IW_UI_BTN_W + 40, IW_UI_BTN_H];
     try { typeResetBtn.helpTip = tr("tip_dt_reset"); } catch (eDtr) {}
     var typeDesc = typePanel.add("statictext", undefined, "", { multiline: true });
-    typeDesc.preferredSize = [520, 32];
+    typeDesc.preferredSize = [640, 30];
     iwItalic(typeDesc);
 
-    var tabs = leftCol.add("tabbedpanel");
-    tabs.alignChildren = "fill";
-    tabs.preferredSize.height = Math.min(280, IW_TABS_MAX_H);
-    tabs.maximumSize = [2000, IW_TABS_MAX_H];   // plafond responsive : jamais plus haut que l'écran
+    // ══ V2 — CORPS : SECTIONS | RÉGLAGES | APERÇU ══════════════════════
+    //  Reprise du motif des dialogues d'InDesign (« Imprimer le cahier »,
+    //  « Imprimer », « Exporter en PDF ») : une LISTE DE SECTIONS en colonne
+    //  à gauche, et le contenu de la section retenue à droite. Les onglets
+    //  horizontaux d'un `tabbedpanel` ne ressemblent à rien de ce que fait
+    //  l'application ; une listbox, elle, reçoit le bleu de sélection du
+    //  système, exactement comme la liste Format / Aperçu / Synthèse.
+    var bodyRow = dlg.add("group");
+    bodyRow.orientation = "row";
+    bodyRow.alignChildren = "fill";
+    bodyRow.spacing = 8;
+
+    // Colonne 1 — la liste des sections
+    var navList = bodyRow.add("listbox", undefined,
+        [tr("tab_compose"), tr("tab_geom"), tr("tab_marks2"), tr("tab_duplex2"), tr("tab_presets")]);
+    navList.preferredSize = [IW_NAV_W, IW_BODY_H];
+    navList.selection = 0;
+
+    // Colonne 2 — les réglages de la section retenue. Les cinq sections y
+    // sont empilées ; une seule est visible à la fois.
+    var contentCol = bodyRow.add("group");
+    contentCol.orientation = "stack";        // superposition, pas empilement
+    contentCol.alignChildren = ["fill", "fill"];
+    contentCol.preferredSize = [IW_CONTENT_W, IW_BODY_H];
+    contentCol.maximumSize = [2000, IW_TABS_MAX_H];
+
+    // `tabs` n'existe plus : chaque ancienne « tab » devient un groupe de
+    // cette pile. On garde un tableau pour la navigation.
+    var iwSections = [];
+    function iwAddSection() {
+        var g = contentCol.add("group");
+        g.orientation = "column";
+        g.alignChildren = "fill";
+        g.margins = 0;
+        g.spacing = IW_UI_GAP;
+        iwSections.push(g);
+        return g;
+    }
+    function showSection(i) {
+        for (var s = 0; s < iwSections.length; s++) {
+            try { iwSections[s].visible = (s === i); } catch (eSs) {}
+        }
+        try { dlg.layout.layout(true); } catch (eSl) {}
+    }
+    navList.onChange = function () {
+        var i = navList.selection ? navList.selection.index : 0;
+        showSection(i);
+    };
 
 
     // helper : ligne label + champ ; la description devient une INFOBULLE
@@ -6514,7 +6578,7 @@ function mainV2(initialConfig) {
     }
 
     // ═══════ Onglet : COMPOSITION (ex-« Mode ») ═══════
-    var tMode = tabs.add("tab", undefined, tr("tab_compose"));
+    var tMode = iwAddSection();
     tMode.orientation = "column"; tMode.alignChildren = "fill"; tMode.margins = 8; tMode.spacing = 8;
 
     // — Bloc choix du mode + description —
@@ -6772,11 +6836,11 @@ function mainV2(initialConfig) {
     //  DEUX onglets différents (« Repères » et « Couleurs ») alors que fond
     //  perdu et blanc tournant sont MUTUELLEMENT EXCLUSIFS : activer l'un
     //  remettait l'autre à zéro depuis un onglet que l'on ne regardait pas.
-    var tGeom = tabs.add("tab", undefined, tr("tab_geom"));
+    var tGeom = iwAddSection();
     tGeom.orientation = "column"; tGeom.alignChildren = "fill"; tGeom.margins = 8; tGeom.spacing = 8;
 
     // ═══════════════ Onglet : REPÈRES ═══════════════
-    var tMarks = tabs.add("tab", undefined, tr("tab_marks2"));
+    var tMarks = iwAddSection();
     tMarks.orientation = "column"; tMarks.alignChildren = "fill"; tMarks.margins = 8; tMarks.spacing = 8;
 
     // — Espacement —
@@ -7101,7 +7165,7 @@ function mainV2(initialConfig) {
     colorMarksState();
 
     // ═══════ Onglet : RECTO/VERSO ═══════
-    var tDup = tabs.add("tab", undefined, tr("tab_duplex2"));
+    var tDup = iwAddSection();
     tDup.orientation = "column"; tDup.alignChildren = "fill"; tDup.margins = 8; tDup.spacing = 8;
     // V2 — le duplex et le pré-traitement des pages partageaient cet onglet
     //  sans rien qui les sépare, alors qu'ils n'ont rien à voir : deux panneaux
@@ -7166,7 +7230,7 @@ function mainV2(initialConfig) {
     dupNA.visible = false;
 
     // ===== Onglet : PRESETS (V10 — dossiers + code couleur) =====
-    var tPreset = tabs.add("tab", undefined, tr("tab_presets"));
+    var tPreset = iwAddSection();
     tPreset.orientation = "column"; tPreset.alignChildren = "fill"; tPreset.margins = 8; tPreset.spacing = 6;
     // — Création en haut —
     var saveRow = tPreset.add("group");
@@ -7684,16 +7748,23 @@ function mainV2(initialConfig) {
         refresh(); // simple mise à jour de l'aperçu (mire perso)
     }
 
-    // ── Colonne droite : APERÇU ──────────────────────────────────────
-    var rightCol = topRow.add("group");
+    // ── Colonne droite : APERÇU, SUR TOUTE LA HAUTEUR ────────────────
+    //  Troisième et dernière colonne du corps. Elle est déclarée ici, après
+    //  les sections, mais ScriptUI place les enfants dans l'ordre des appels :
+    //  elle arrive donc bien à droite de la liste et des réglages.
+    //  `alignment` en « fill » vertical est ce qui la fait occuper toute la
+    //  hauteur du corps plutôt que se centrer sur son contenu.
+    var rightCol = bodyRow.add("group");
     rightCol.orientation = "column";
     rightCol.alignChildren = "fill";
+    rightCol.alignment = ["fill", "fill"];
     rightCol.spacing = 6;
-    rightCol.preferredSize.width = IW_CANVAS_W + 24;
+    rightCol.preferredSize = [IW_CANVAS_W + 24, IW_BODY_H];
 
     var prevPanel = rightCol.add("panel", undefined, tr("panel_preview"));
     prevPanel.orientation = "column";
     prevPanel.alignChildren = "fill";
+    prevPanel.alignment = ["fill", "fill"];
     prevPanel.margins = 6; prevPanel.spacing = 4;
 
     // contexte (pièce source) AU-DESSUS du dessin
@@ -7707,6 +7778,10 @@ function mainV2(initialConfig) {
     // possède pas de type "canvas" ; onDraw sur un panel est la méthode fiable.)
     var canvas = prevPanel.add("panel", undefined, undefined);
     canvas.preferredSize = [IW_CANVAS_W, IW_CANVAS_H];
+    // c'est le canvas qui absorbe la hauteur restante de la colonne : sans
+    // cet alignement, il garderait sa taille voulue et laisserait un vide
+    // sous lui quand la fenêtre est plus haute que prévu.
+    canvas.alignment = ["fill", "fill"];
 
     // — Décalage de PAN (déplacement de la vue), en pixels écran —
     var previewPan = { x: 0, y: 0 };
@@ -8777,6 +8852,12 @@ function mainV2(initialConfig) {
     // la barre du bas garde un peu d'air : c'est la zone d'action, la serrer
     // autant que les panneaux de réglage rendrait « Lancer » difficile à viser.
     try { mainBtns.spacing = 8; } catch (eTb) {}
+    // les trois colonnes du corps restent séparées : à 4 px, la liste des
+    // sections toucherait les réglages et la frontière disparaîtrait.
+    try { bodyRow.spacing = 8; } catch (eTb2) {}
+
+    // section affichée au départ : la première de la liste
+    try { showSection(0); } catch (eSs0) {}
     // changer polices et marges modifie les tailles voulues de tous les
     // contrôles : sans recalcul, la fenêtre garderait la géométrie d'avant.
     try { dlg.layout.layout(true); } catch (eTl) {}
