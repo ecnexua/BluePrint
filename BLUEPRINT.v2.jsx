@@ -59,6 +59,38 @@
 //      • Garde-fou d'écran étroit : trois colonnes côte à côte élargissent la
 //        fenêtre ; la colonne des réglages se resserre en premier (jusqu'à
 //        420 px) pour que celle de droite ne sorte pas de l'écran.
+//    LE VRAI VISUEL DE LA SÉLECTION DANS L'APERÇU
+//      • L'aperçu dessinait des rectangles bleus numérotés. Ils disaient
+//        correctement OÙ les pièces tombent, mais pas CE QU'ON IMPOSE : sur
+//        une planche de 24 cartes, rien ne distinguait le bon visuel du
+//        mauvais. Chaque objet sélectionné est désormais exporté une fois en
+//        bitmap (PageItem.exportFile) et dessiné dans sa pièce (drawImage).
+//      • L'export a lieu AVANT l'ouverture de la fenêtre, et une seule fois :
+//        exportFile refuse de s'exécuter tant qu'un dialogue modal est ouvert
+//        — la même contrainte qui oblige l'export des films à attendre la
+//        fermeture de la fenêtre. La sélection ne pouvant plus changer
+//        ensuite, une passe suffit pour toute la session.
+//      • Les préférences d'export PNG/JPEG sont GLOBALES à l'application :
+//        elles sont sauvegardées et rendues, pour ne pas modifier en douce les
+//        exports suivants de l'utilisateur. Le document, lui, n'est pas touché.
+//      • La vignette est posée aux SEPT endroits où l'aperçu peignait l'aplat
+//        de la pièce (fond perdu intérieur/extérieur, blanc tournant dedans /
+//        dehors, sans marge) : elle tombe exactement où tombait l'aplat, la
+//        géométrie ne bouge pas d'un pixel.
+//      • ScriptUI ne sait pas pivoter une image : dans un emplacement tourné
+//        d'un quart de tour, la vignette est posée à SON ratio, centrée,
+//        plutôt qu'étirée — un visuel déformé mentirait sur ce qui sera
+//        imposé. Rotation de pièce et rotation d'emplacement se cumulent en
+//        OU EXCLUSIF : deux quarts de tour rendent le ratio d'origine.
+//      • En cas de DÉBORDEMENT, la vignette n'est pas dessinée : le corail est
+//        l'avertissement, le recouvrir le masquerait.
+//      • Le numéro de pièce reçoit une pastille claire quand un visuel passe
+//        dessous — lisible sur un aplat bleu, il se noyait dans une image.
+//      • Réglages ▸ « Afficher le visuel de la sélection » (activé par
+//        défaut, mémorisé) pour revenir aux aplats sur une sélection lourde.
+//      • Repli complet : si l'export échoue (PNG refusé, objet non
+//        rastérisable), le JPEG prend le relais ; si tout échoue, l'aperçu
+//        reprend ses aplats sans autre changement.
 //    Mires : UNE seule taille, et de vrais cercles dans l'aperçu
 //      • Les croix de BORD échappaient au plafond : leur taille était calculée
 //        à part, « longueur × 1,6 » (11,2 mm par défaut), dans le moteur
@@ -633,6 +665,155 @@ function iwMeasurePieceBounds(item) {
     try { b = item.geometricBounds; } catch (e1) { b = null; }
     if (!b || b.length !== 4) { try { b = item.visibleBounds; } catch (e2) { b = null; } }
     return b;
+}
+
+// ──────────────────────────────────────────────────────────────────────
+//  V2 — VIGNETTES : LE VRAI VISUEL DE LA SÉLECTION DANS L'APERÇU
+//
+//  L'aperçu dessinait des rectangles bleus numérotés. Ils disaient
+//  correctement OÙ les pièces tombent, mais pas CE QU'ON IMPOSE : sur une
+//  planche de 24 cartes, rien ne distinguait le bon visuel du mauvais, ni
+//  ne montrait qu'une pièce partait à l'envers.
+//
+//  InDesign sait exporter un objet ISOLÉ en bitmap (PageItem.exportFile),
+//  et ScriptUI sait dessiner un bitmap dans un canvas (drawImage). Le pont
+//  entre les deux, c'est ici : on exporte une fois chaque objet sélectionné
+//  dans un PNG temporaire, et l'aperçu pose ce PNG à la place de l'aplat.
+//
+//  DEUX CONTRAINTES commandent tout le reste :
+//   • exportFile ne s'exécute PAS tant qu'une fenêtre modale est ouverte
+//     (même raison qui oblige l'export des films à attendre la fermeture de
+//     la fenêtre principale, voir après dlg.show()). Les vignettes sont donc
+//     produites AVANT la création de la fenêtre, une seule fois — ce qui
+//     tombe bien : la sélection ne peut pas changer pendant ce temps-là.
+//   • les préférences d'export sont GLOBALES à l'application : on les
+//     sauvegarde et on les rend, sinon on modifierait en douce les exports
+//     suivants de l'utilisateur.
+// ──────────────────────────────────────────────────────────────────────
+var IW_THUMB_MAX_PX    = 720;   // côté le plus long de la vignette, en pixels
+var IW_THUMB_DPI_MIN   = 18;
+var IW_THUMB_DPI_MAX   = 144;
+var IW_THUMB_MAX_ITEMS = 16;    // au-delà, l'aperçu recycle les vignettes
+
+function iwThumbFolder() {
+    try {
+        var f = new Folder(Folder.temp.fsName + "/Blueprint-apercu");
+        if (!f.exists) f.create();
+        return f.exists ? f : null;
+    } catch (e) { return null; }
+}
+
+//  Résolution choisie pour que la vignette ne dépasse pas IW_THUMB_MAX_PX
+//  sur son plus grand côté : une carte de visite et une affiche A0 coûtent
+//  ainsi le même temps d'export et la même mémoire.
+function iwThumbDPI(b) {
+    var wIn = Math.abs(b[3] - b[1]) / 72;
+    var hIn = Math.abs(b[2] - b[0]) / 72;
+    var big = Math.max(wIn, hIn);
+    if (!(big > 0)) return 72;
+    var dpi = Math.round(IW_THUMB_MAX_PX / big);
+    if (dpi < IW_THUMB_DPI_MIN) dpi = IW_THUMB_DPI_MIN;
+    if (dpi > IW_THUMB_DPI_MAX) dpi = IW_THUMB_DPI_MAX;
+    return dpi;
+}
+
+//  Exporte UN objet en bitmap. Renvoie le File écrit, ou null.
+function iwExportThumbFile(item, fold, base) {
+    var b = iwMeasurePieceBounds(item);
+    if (!b || b.length !== 4) return null;
+    var dpi = iwThumbDPI(b);
+    var out = null;
+
+    var sv = null;
+    try {
+        var p = app.pngExportPreferences;
+        sv = { res: p.exportResolution, tr: p.transparentBackground, aa: p.antiAlias };
+        p.exportResolution = dpi;
+        //  Fond BLANC, pas transparent : la feuille de l'aperçu est blanche,
+        //  et la transparence PNG n'est pas rendue de façon fiable par
+        //  ScriptUI selon les versions.
+        p.transparentBackground = false;
+        p.antiAlias = true;
+    } catch (ePr) { sv = null; }
+
+    var fPng = new File(fold.fsName + "/" + base + ".png");
+    try { if (fPng.exists) fPng.remove(); } catch (eR0) {}
+    try {
+        item.exportFile(ExportFormat.PNG_FORMAT, fPng, false);
+        if (fPng.exists) out = fPng;
+    } catch (eP) { out = null; }
+
+    try {
+        if (sv) {
+            var q = app.pngExportPreferences;
+            q.exportResolution = sv.res;
+            q.transparentBackground = sv.tr;
+            q.antiAlias = sv.aa;
+        }
+    } catch (eR1) {}
+
+    //  Repli JPEG : l'export PNG d'un objet isolé n'est pas offert par
+    //  toutes les versions, ni par tous les types d'objet.
+    if (!out) {
+        var sj = null;
+        try {
+            var pj = app.jpegExportPreferences;
+            sj = { res: pj.exportResolution, q: pj.jpegQuality };
+            pj.exportResolution = dpi;
+            try { pj.jpegQuality = JPEGOptionsQuality.HIGH; } catch (eQ) {}
+        } catch (ePj) { sj = null; }
+        var fJpg = new File(fold.fsName + "/" + base + ".jpg");
+        try { if (fJpg.exists) fJpg.remove(); } catch (eR2) {}
+        try {
+            item.exportFile(ExportFormat.JPG, fJpg, false);
+            if (fJpg.exists) out = fJpg;
+        } catch (eJ) { out = null; }
+        try {
+            if (sj) {
+                var qj = app.jpegExportPreferences;
+                qj.exportResolution = sj.res;
+                qj.jpegQuality = sj.q;
+            }
+        } catch (eR3) {}
+    }
+    return out;
+}
+
+//  Construit la liste des vignettes, une par objet sélectionné.
+//  Chaque entrée porte aussi les dimensions SOURCE (en points) : l'aperçu en
+//  a besoin pour respecter le ratio quand il ne peut pas étirer l'image.
+//  Renvoie [] si aucune vignette n'a pu être produite : l'aperçu reprend
+//  alors ses aplats, sans que rien d'autre ne change.
+function iwBuildThumbs(items) {
+    var out = [], any = false;
+    if (!items || !items.length) return out;
+    var fold = iwThumbFolder();
+    if (!fold) return out;
+    var stamp = String(new Date().getTime());
+    var n = Math.min(items.length, IW_THUMB_MAX_ITEMS);
+    for (var i = 0; i < n; i++) {
+        var b = iwMeasurePieceBounds(items[i]);
+        if (!b || b.length !== 4) { out.push(null); continue; }
+        var f = iwExportThumbFile(items[i], fold, "bp-" + stamp + "-" + i);
+        if (!f) { out.push(null); continue; }
+        var img = null;
+        try { img = ScriptUI.newImage(f.fsName); } catch (eI1) { img = null; }
+        if (!img) { try { img = ScriptUI.newImage(f); } catch (eI2) { img = null; } }
+        if (!img) { try { f.remove(); } catch (eI3) {} out.push(null); continue; }
+        out.push({ img: img, file: f,
+                   w: Math.abs(b[3] - b[1]), h: Math.abs(b[2] - b[0]) });
+        any = true;
+    }
+    return any ? out : [];
+}
+
+//  Les PNG sont des fichiers temporaires : on les retire dès que la fenêtre
+//  est fermée, sinon chaque lancement en laisserait un jeu derrière lui.
+function iwClearThumbs(thumbs) {
+    if (!thumbs) return;
+    for (var i = 0; i < thumbs.length; i++) {
+        if (thumbs[i] && thumbs[i].file) { try { thumbs[i].file.remove(); } catch (e) {} }
+    }
 }
 
 // ============================================================
@@ -1426,6 +1607,12 @@ var I18N = {
                         it: "Patchwork: seleziona almeno 2 oggetti prima di avviare." },
     // fenêtre Réglages
     panel_ui:         { fr: "Personnalisation de l'interface", en: "Interface customization",        it: "Personalizzazione dell'interfaccia" },
+    cb_prevart:       { fr: "Afficher le visuel de la sélection",
+                        en: "Show the artwork of the selection",
+                        it: "Mostra il visual della selezione" },
+    tip_prevart:      { fr: "L'aperçu dessine la sélection elle-même dans chaque pièce, au lieu d'un aplat bleu numéroté. Décochez si la sélection est très lourde à rendre.",
+                        en: "The preview draws the selection itself inside every piece, instead of a numbered blue block. Uncheck if the selection is very slow to render.",
+                        it: "L'anteprima disegna la selezione stessa in ogni pezzo, invece di un blocco blu numerato. Deseleziona se la selezione è molto pesante da rendere." },
     cb_prevtransp:    { fr: "Fond de l'aperçu transparent",    en: "Transparent preview background", it: "Sfondo anteprima trasparente" },
     tip_prevtransp:   { fr: "Retire le fond foncé de l'aperçu.",
                         en: "Removes the dark preview background.",
@@ -5314,6 +5501,46 @@ function iwDrawPreview(canvas, L, zone, pageWH, marks, zoom, pan) {
 
     var bleed = L.bleed || 0;
 
+    // ── LE VRAI VISUEL DE LA SÉLECTION ──────────────────────────────
+    //  `drawArt` remplace l'aplat bleu par la vignette de l'objet source.
+    //  Il est appelé À CHAQUE ENDROIT où l'aperçu peignait « la pièce »,
+    //  donc dans les sept variantes de pose (fond perdu intérieur/extérieur,
+    //  blanc tournant dedans/dehors, sans marge) : la vignette tombe
+    //  exactement là où l'aplat tombait, et la géométrie ne bouge pas d'un
+    //  pixel.
+    var artThumbs = (marks && marks.thumbs && marks.thumbs.length) ? marks.thumbs : null;
+    //  QUART DE TOUR. Deux rotations se cumulent : celle appliquée à la pièce
+    //  entière (bouton « Tourner », marks.pieceRot) et celle propre à un
+    //  emplacement (Dutch Cut, s.rot). Deux quarts de tour se compensent et
+    //  rendent le ratio d'origine — d'où le OU EXCLUSIF, et non un simple OU.
+    var artQuarter = false;
+    try { artQuarter = ((Math.abs(Number(marks && marks.pieceRot) || 0)) % 180) === 90; } catch (eQ) {}
+    function artRot(s) { return (!!(s && s.rot)) !== artQuarter; }
+    function drawArt(ax, ay, aw, ah, idx, rotated) {
+        if (!artThumbs || !(aw > 1) || !(ah > 1)) return false;
+        //  DÉBORDEMENT : la planche ne tient pas. Le corail est là pour le
+        //  dire ; le recouvrir d'un joli visuel masquerait l'avertissement.
+        if (L.overflow) return false;
+        var t = artThumbs[idx % artThumbs.length];
+        if (!t || !t.img) return false;
+        try {
+            if (rotated) {
+                //  ScriptUI ne sait pas pivoter une image. Dans un
+                //  emplacement tourné d'un quart de tour, on la pose donc À
+                //  SON RATIO, centrée, plutôt que de l'étirer : un visuel
+                //  déformé mentirait sur ce qui sera réellement imposé. La
+                //  flèche ↻ reste là pour dire que la pièce, elle, tourne.
+                var ar = (t.w > 0 && t.h > 0) ? (t.w / t.h) : (aw / ah);
+                var dw = aw, dh = aw / ar;
+                if (dh > ah) { dh = ah; dw = ah * ar; }
+                g.drawImage(t.img, ax + (aw - dw) / 2, ay + (ah - dh) / 2, dw, dh);
+            } else {
+                g.drawImage(t.img, ax, ay, aw, ah);
+            }
+            return true;
+        } catch (eDr) { return false; }
+    }
+
     // épaisseur des traits de repère DANS L'APERÇU, reflétant le mode :
     //   Riso (6) = fin ; Sérigraphie (7) = épais. Purement visuel ici.
     var mkW = 1.7;
@@ -5336,6 +5563,7 @@ function iwDrawPreview(canvas, L, zone, pageWH, marks, zoom, pan) {
         // est retournée (et qu'il n'y a pas d'overflow, prioritaire en corail).
         var slotFill = pieceFill;
         var slotBleedFill = bleedFill;
+        var slotArt = false;   // une vignette a-t-elle été posée sur CE slot ?
         if (s.flip && !L.overflow) { slotFill = flipFill; slotBleedFill = flipBleedFill; }
 
         // — LIGNE DE COUPE : à l'intérieur de la pièce, à `bleed` du bord —
@@ -5384,12 +5612,14 @@ function iwDrawPreview(canvas, L, zone, pageWH, marks, zoom, pan) {
             }
             fillRect(x, y, w, h, bleedRingFill);
             fillRect(px0, py0, pw, ph, slotFill);
+            slotArt = drawArt(px0, py0, pw, ph, i, artRot(s));
             strokeRect(px0, py0, pw, ph, cutPen);
             cx0 = px0; cy0 = py0; cx1 = px1; cy1 = py1;
         } else if (extOn && wmInside) {
             // (cas théorique : jamais atteint car wm exclut le fond perdu et
             //  wmInside implique non-extérieur ; conservé par prudence)
             fillRect(px0, py0, pw, ph, slotFill);
+            slotArt = drawArt(px0, py0, pw, ph, i, artRot(s));
             cx0 = px0; cy0 = py0; cx1 = px1; cy1 = py1;
         } else if (bl > 0 && !wmInsideOn) {
             // FOND PERDU INTÉRIEUR (historique) : pièce = slot, coupe rentrée.
@@ -5398,6 +5628,7 @@ function iwDrawPreview(canvas, L, zone, pageWH, marks, zoom, pan) {
             if (cy1 <= cy0) { cy0 = y + h / 2 - 0.5; cy1 = y + h / 2 + 0.5; }
             fillRect(x, y, w, h, slotBleedFill);
             fillRect(cx0, cy0, cx1 - cx0, cy1 - cy0, slotFill);
+            slotArt = drawArt(cx0, cy0, cx1 - cx0, cy1 - cy0, i, artRot(s));
             strokeRect(cx0, cy0, cx1 - cx0, cy1 - cy0, cutPen);
         } else if (wmInsideOn) {
             // BLANC TOURNANT INTÉRIEUR : image ajustée (ratio conservé) dans le
@@ -5425,11 +5656,13 @@ function iwDrawPreview(canvas, L, zone, pageWH, marks, zoom, pan) {
                 fillRect(frX, frY, frW, frH, wmFill);
                 strokeRect(frX, frY, frW, frH, wmEdgePen);
                 fillRect(imgX2, imgY2, imgW2, imgH2, slotFill);
+                slotArt = drawArt(imgX2, imgY2, imgW2, imgH2, i, artRot(s));
                 strokeRect(imgX2, imgY2, imgW2, imgH2, wmEdgePen);
                 // la coupe (repères) suit le CADRE du blanc tournant
                 cx0 = frX; cy0 = frY; cx1 = frX + frW; cy1 = frY + frH;
             } else {
                 fillRect(x, y, w, h, slotFill);
+                slotArt = drawArt(x, y, w, h, i, artRot(s));
                 cx0 = x; cy0 = y; cx1 = x + w; cy1 = y + h;
             }
         } else if (extOn && marks && marks.wm && marks.wm.outside && marks.wm.enabled) {
@@ -5443,6 +5676,7 @@ function iwDrawPreview(canvas, L, zone, pageWH, marks, zoom, pan) {
             }
             fillRect(x, y, w, h, wmFillE);          // marge (cadre) autour
             fillRect(px0, py0, pw, ph, slotFill);   // pièce pleine au centre
+            slotArt = drawArt(px0, py0, pw, ph, i, artRot(s));
             strokeRect(px0, py0, pw, ph, wmEdgePen);// liseré interne (pièce/marge)
             // la COUPE suit le bord EXTÉRIEUR du cadre (slot entier)
             cx0 = x; cy0 = y; cx1 = x + w; cy1 = y + h;
@@ -5450,6 +5684,7 @@ function iwDrawPreview(canvas, L, zone, pageWH, marks, zoom, pan) {
         } else {
             // sans marge : la pièce = la zone finale
             fillRect(x, y, w, h, slotFill);
+            slotArt = drawArt(x, y, w, h, i, artRot(s));
             cx0 = x; cy0 = y; cx1 = x + w; cy1 = y + h;
         }
 
@@ -5512,6 +5747,11 @@ function iwDrawPreview(canvas, L, zone, pageWH, marks, zoom, pan) {
         try {
             var lab = s.label || String(i + 1);
             var tx = x + w / 2 - (lab.length * 3), ty = y + h / 2 - 6;
+            //  Le numéro se posait à même la pièce : lisible sur un aplat
+            //  bleu, illisible dès qu'un vrai visuel passe dessous. Avec une
+            //  vignette, il reçoit donc une pastille claire — une étiquette
+            //  posée sur l'épreuve, pas un texte noyé dedans.
+            if (slotArt) iwFillRound(g, tx - 5, ty - 3, lab.length * 6 + 12, 16, 4, [1, 1, 1, 0.82]);
             g.drawString(lab, labelPen, tx, ty);
             if (s.rot) g.drawString("\u21BB", labelPen, x + w / 2 - 3, y + h / 2 + 6);
             // pièce retournée 180° : flèche tête-bêche + barre de "haut" en bas
@@ -6547,6 +6787,21 @@ function mainV2(initialConfig) {
     if (hasSel) {
         var gb0 = iwMeasurePieceBounds(selItems[0]);   // V20 — mesure partagée
         if (gb0 && gb0.length === 4) piece = { w: gb0[3] - gb0[1], h: gb0[2] - gb0[0] };
+    }
+
+    // ── VIGNETTES DE LA SÉLECTION ────────────────────────────────────
+    //  C'est le SEUL moment où on peut les produire : exportFile refuse de
+    //  s'exécuter tant qu'une fenêtre modale est ouverte, et la fenêtre
+    //  principale est modale. On paie donc ici quelques dixièmes de seconde,
+    //  une fois, avant l'affichage — et la sélection ne peut plus changer
+    //  ensuite, donc une seule passe suffit pour toute la session.
+    var IW_PREV_ART_ON = (function () {
+        try { var pf = iwLoadPrefs(); return (pf && pf.previewArt === false) ? false : true; }
+        catch (ePA) { return true; }
+    })();
+    var IW_PREV_THUMBS = [];
+    if (hasSel && IW_PREV_ART_ON) {
+        try { IW_PREV_THUMBS = iwBuildThumbs(selItems); } catch (eTh0) { IW_PREV_THUMBS = []; }
     }
 
     // ── Fenêtre, disposition 2 colonnes : contrôles | aperçu ─────────
@@ -7812,6 +8067,7 @@ function mainV2(initialConfig) {
         // `colorNamePt` a disparu : le nom de couleur est fixé à 8 pt blanc
         // depuis la v4, le réglage était mort.
         showDims:        prefOr("showDims", true),      // afficher les cotes dans l'aperçu
+        previewArt:      prefOr("previewArt", true),    // dessiner le visuel de la sélection dans l'aperçu
         previewTransparent: prefOr("previewTransparent", false), // fond de l'aperçu transparent
         screenPPI:       prefOr("screenPPI", 96)        // densité écran (px/pouce) pour l'affichage « taille réelle »
     };
@@ -7866,6 +8122,9 @@ function mainV2(initialConfig) {
         // — PERSONNALISATION DE L'INTERFACE —
         var pUI = sw.add("panel", undefined, tr("panel_ui"));
         pUI.orientation = "column"; pUI.alignChildren = "left"; pUI.margins = 8; pUI.spacing = 4;
+        var sPrevArt = pUI.add("checkbox", undefined, tr("cb_prevart"));
+        sPrevArt.value = !!settings.previewArt;
+        try { sPrevArt.helpTip = tr("tip_prevart"); } catch (ePA2) {}
         var sPrevTransp = pUI.add("checkbox", undefined, tr("cb_prevtransp"));
         sPrevTransp.value = !!settings.previewTransparent;
         try { sPrevTransp.helpTip = tr("tip_prevtransp"); } catch (ePT) {}
@@ -7905,6 +8164,8 @@ function mainV2(initialConfig) {
 
         // — Personnalisation -> settings + persistance durable (prefs) —
         function numOr(s, d) { var v = parseFloat(s); return (isFinite(v) && v > 0) ? v : d; }
+        var artWas = !!settings.previewArt;
+        settings.previewArt      = !!sPrevArt.value;
         settings.previewTransparent = !!sPrevTransp.value;
         settings.showDims        = !!sShowDims.value;
         settings.regDiam         = iwRegDiam(numOr(sRegDiam.text, IW_REG_MAX_MM));
@@ -7914,6 +8175,7 @@ function mainV2(initialConfig) {
         settings.colorBarH       = numOr(sColBarH.text, 11);
         settings.screenPPI       = calPxPerMM * 25.4;
         iwSavePrefs({
+            previewArt: settings.previewArt,
             previewTransparent: settings.previewTransparent, showDims: settings.showDims,
             regDiam: settings.regDiam, crossCornerGap: settings.crossCornerGap,
             colorSwatchSize: settings.colorSwatchSize,
@@ -7926,6 +8188,17 @@ function mainV2(initialConfig) {
         // Mémorisation persistante (ou effacement de la mémorisation)
         if (sRegRemember.value) iwSaveRegMark(settings.regFile);
         else iwSaveRegMark("");
+
+        //  Le visuel vient d'être RALLUMÉ alors qu'aucune vignette n'a été
+        //  produite au démarrage : impossible d'exporter d'ici, une fenêtre
+        //  modale est ouverte. On relance donc la fenêtre principale — le
+        //  même chemin que le changement de langue — pour que l'export ait
+        //  lieu au bon moment.
+        if (settings.previewArt && !artWas && hasSel && (!IW_PREV_THUMBS || !IW_PREV_THUMBS.length)) {
+            pendingRelaunch = gatherConfig();
+            dlg.close(2);
+            return;
+        }
 
         // Changement de langue éventuel -> relance la fenêtre principale
         var newCode = LANG_CODES[sLangDd.selection ? sLangDd.selection.index : 0];
@@ -8211,7 +8484,12 @@ function mainV2(initialConfig) {
             crossCornerGap: settings.crossCornerGap,
             colorSwatchSize: settings.colorSwatchSize, colorBarW: settings.colorBarW,
             colorBarH: settings.colorBarH,
-            showDims: settings.showDims, previewTransparent: settings.previewTransparent
+            showDims: settings.showDims, previewTransparent: settings.previewTransparent,
+            //  Décocher le réglage éteint le dessin immédiatement, sans
+            //  attendre de relance : seule la FABRICATION des vignettes est
+            //  contrainte par la modalité, pas leur affichage.
+            thumbs: (settings.previewArt === false) ? null : IW_PREV_THUMBS,
+            pieceRot: origRotation || 0
         };
     }
     function refresh() {
@@ -9088,6 +9366,11 @@ function mainV2(initialConfig) {
     };
 
     var rc = dlg.show();
+
+    // Les vignettes étaient des fichiers temporaires : la fenêtre est fermée,
+    // plus personne ne les dessine, on les retire. (Une relance — langue ou
+    // rallumage du visuel — repassera par iwBuildThumbs.)
+    try { iwClearThumbs(IW_PREV_THUMBS); } catch (eCT) {}
 
     // EXPORT DES FILMS demandé : la fenêtre principale est maintenant FERMÉE,
     // donc aucun dialogue modal n'est actif -> exportFile peut s'exécuter.
