@@ -59,6 +59,33 @@
 //      • Garde-fou d'écran étroit : trois colonnes côte à côte élargissent la
 //        fenêtre ; la colonne des réglages se resserre en premier (jusqu'à
 //        420 px) pour que celle de droite ne sorte pas de l'écran.
+//    Aperçu plus grand, plus lisible, et COINS ARRONDIS
+//      • L'aperçu passe de 35 % à 44 % de la largeur d'écran (plafond 700 ->
+//        900 px), sa marge interne de 26 à 16 px, et le bandeau de contrôles
+//        qui l'entoure de 150 à 122 px de haut : la feuille occupe donc
+//        nettement plus de surface à zoom égal.
+//      • LISIBILITÉ : fond de l'aperçu assombri (0,20 -> 0,13). Ce n'est pas
+//        cosmétique — la feuille est blanche, et plus le fond est sombre, plus
+//        son contour se détache ; l'ancien gris-ardoise la faisait fondre dans
+//        le panneau. Ombre portée en deux passes décalées (retombée
+//        progressive au lieu d'un liseré net). Traits épaissis : le trait de
+//        coupe passe de 1,2 à 1,8 px, les repères de 1,2 à 1,7.
+//      • COINS ARRONDIS partout où le script DESSINE lui-même : fond de
+//        l'aperçu, feuille et son ombre, lignes et cadre de la liste des
+//        presets, cellules et cadre de la grille d'alignement, pastilles
+//        d'encre de l'export, nuancier et roue chromatique, rectangle de
+//        calibrage — ce dernier au vrai rayon d'une carte ISO/IEC 7810
+//        (3,18 mm), pour qu'il se superpose exactement à la carte posée sur
+//        l'écran.
+//      • La bibliothèque graphique de ScriptUI n'ayant NI arc NI courbe de
+//        Bézier, l'arrondi est polygonalisé (iwRoundRectPts) : quatre segments
+//        par quart de cercle, rayon borné à la demi-plus-petite-dimension.
+//      • DEUX LIMITES, assumées. (1) Les contrôles NATIFS — boutons, listes
+//        déroulantes, cases à cocher, listbox — sont rendus par le système :
+//        ScriptUI n'expose aucun moyen de les redessiner, ils gardent leurs
+//        angles. (2) Les PIÈCES IMPOSÉES restent à angles vifs dans l'aperçu :
+//        leur contour EST le trait de coupe, l'arrondir ferait mentir l'aperçu
+//        sur ce que le massicot va produire.
 //    Aspect « panneau InDesign »
 //      • ScriptUI ne permet pas de redessiner les contrôles natifs. Les trois
 //        leviers réellement disponibles sont exploités, en une passe qui
@@ -1767,6 +1794,62 @@ function iwStrokeCircle(g, cx, cy, r, rgba, w) {
     for (var i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
     g.closePath();
     g.strokePath(g.newPen(g.PenType.SOLID_COLOR, rgba, w || 1));
+}
+
+// ─────────────────────────────────────────────────────────────────────
+//  V2 — RECTANGLES À COINS ARRONDIS.
+//  La bibliothèque graphique de ScriptUI se limite à moveTo / lineTo /
+//  rectPath / ellipsePath : ni arc, ni courbe de Bézier, et aucun rayon de
+//  bordure. Un coin arrondi doit donc être POLYGONALISÉ — quelques segments
+//  par quart de cercle, comme le fait déjà iwCirclePoints pour les mires.
+//  À 4 segments par coin le rendu est déjà lisse aux rayons employés ici.
+//
+//  À noter : cela n'arrondit que ce que NOUS dessinons. Les contrôles natifs
+//  (boutons, listes déroulantes, cases à cocher, listbox) sont rendus par le
+//  système et gardent leurs angles — ScriptUI n'expose aucun moyen de les
+//  redessiner.
+// ─────────────────────────────────────────────────────────────────────
+var IW_ROUND_SEG = 4;   // segments par quart de cercle
+
+function iwRoundRectPts(x, y, w, h, r) {
+    // rayon borné à la demi-plus-petite-dimension, sinon les coins se croisent
+    var mx = Math.min(w, h) / 2;
+    if (!(r > 0)) r = 0;
+    if (r > mx) r = mx;
+    if (r <= 0.5) return [[x, y], [x + w, y], [x + w, y + h], [x, y + h]];
+
+    var pts = [], i, a;
+    var half = Math.PI / 2, step = half / IW_ROUND_SEG;
+    // centres des quatre arcs, dans l'ordre : HG, HD, BD, BG
+    var arcs = [
+        { cx: x + r,     cy: y + r,     a0: Math.PI },
+        { cx: x + w - r, cy: y + r,     a0: -half   },
+        { cx: x + w - r, cy: y + h - r, a0: 0       },
+        { cx: x + r,     cy: y + h - r, a0: half    }
+    ];
+    for (var k = 0; k < 4; k++) {
+        for (i = 0; i <= IW_ROUND_SEG; i++) {
+            a = arcs[k].a0 + i * step;
+            pts.push([arcs[k].cx + Math.cos(a) * r, arcs[k].cy + Math.sin(a) * r]);
+        }
+    }
+    return pts;
+}
+function iwRoundPath(g, x, y, w, h, r) {
+    var pts = iwRoundRectPts(x, y, w, h, r);
+    g.newPath();
+    g.moveTo(pts[0][0], pts[0][1]);
+    for (var i = 1; i < pts.length; i++) g.lineTo(pts[i][0], pts[i][1]);
+    g.closePath();
+    return pts.length;
+}
+function iwFillRound(g, x, y, w, h, r, rgba) {
+    iwRoundPath(g, x, y, w, h, r);
+    g.fillPath(g.newBrush(g.BrushType.SOLID_COLOR, rgba));
+}
+function iwStrokeRound(g, x, y, w, h, r, rgba, lw) {
+    iwRoundPath(g, x, y, w, h, r);
+    g.strokePath(g.newPen(g.PenType.SOLID_COLOR, rgba, lw || 1));
 }
 
 // convertit "#RRGGBB" -> [r,g,b] (0..1) pour ScriptUI ; null si invalide
@@ -3852,10 +3935,8 @@ function iwRunInkExport() {
                 var rr = rgbVal ? rgbVal[0] / 255 : 0.8;
                 var gg = rgbVal ? rgbVal[1] / 255 : 0.8;
                 var bb = rgbVal ? rgbVal[2] / 255 : 0.8;
-                g.newPath();
-                g.moveTo(0, 0); g.lineTo(W, 0); g.lineTo(W, H); g.lineTo(0, H); g.closePath();
-                try { g.fillPath(g.newBrush(g.BrushType.SOLID_COLOR, [rr, gg, bb, 1])); } catch (eF) {}
-                try { g.strokePath(frame); } catch (eS2) {}
+                try { iwFillRound(g, 0.5, 0.5, W - 1, H - 1, 3, [rr, gg, bb, 1]); } catch (eF) {}
+                try { iwRoundPath(g, 0.5, 0.5, W - 1, H - 1, 3); g.strokePath(frame); } catch (eS2) {}
             };
         })(inks[i].rgb);
         var cb = row.add("checkbox", undefined, inks[i].name);
@@ -5090,17 +5171,24 @@ function iwDrawPreview(canvas, L, zone, pageWH, marks, zoom, pan) {
         g.strokePath(pen);
     }
 
-    // — fond de l'aperçu (ardoise uni), SAUF si « transparent » est demandé
-    //   (dans ce cas l'aperçu prend la couleur native de la fenêtre) —
+    // — fond de l'aperçu, SAUF si « transparent » est demandé (dans ce cas
+    //   l'aperçu prend la couleur native de la fenêtre) —
+    //   V2 : fond ASSOMBRI (0.20 -> 0.13) et coins ARRONDIS. Le gain n'est pas
+    //   cosmétique : la feuille est blanche, et plus le fond est sombre, plus
+    //   son contour se détache. L'ancien gris-ardoise clair la faisait fondre
+    //   dans le panneau.
+    var IW_PV_RADIUS = 8;
     if (!marks || !marks.previewTransparent) {
-        fillRect(0, 0, W, H, g.newBrush(g.BrushType.SOLID_COLOR, [0.20, 0.22, 0.28, 1]));
+        iwFillRound(g, 0, 0, W, H, IW_PV_RADIUS, [0.13, 0.14, 0.18, 1]);
     }
 
     if (!pageWH || pageWH.w <= 0 || pageWH.h <= 0) return;
 
     // — échelle pour faire tenir la feuille (marge interne confortable) —
     //   puis multipliée par le facteur de zoom (1 = ajustée à la fenêtre).
-    var pad = 26;
+    //   V2 : marge interne réduite de 26 à 16 px — sur un canvas désormais
+    //   plus grand, 26 px de vide de chaque côté était de la place perdue.
+    var pad = 16;
     var zf = (zoom && zoom > 0) ? zoom : 1;
     var sc = Math.min((W - pad * 2) / pageWH.w, (H - pad * 2) / pageWH.h) * zf;
     if (!isFinite(sc) || sc <= 0) return;
@@ -5112,31 +5200,33 @@ function iwDrawPreview(canvas, L, zone, pageWH, marks, zoom, pan) {
     function PX(mm) { return offX + mm * sc; }
     function PY(mm) { return offY + mm * sc; }
 
-    // — ombre portée légère (un rectangle gris décalé sous la feuille) —
-    fillRect(offX + 4, offY + 4, sheetW, sheetH,
-             g.newBrush(g.BrushType.SOLID_COLOR, [0.12, 0.13, 0.17, 1]));
+    // — ombre portée sous la feuille — V2 : deux passes décalées plutôt qu'une
+    //   seule, ce qui donne une retombée progressive au lieu d'un liseré net,
+    //   et détache franchement la feuille du fond.
+    var IW_SHEET_R = 5;
+    iwFillRound(g, offX + 6, offY + 7, sheetW, sheetH, IW_SHEET_R, [0, 0, 0, 0.28]);
+    iwFillRound(g, offX + 3, offY + 3, sheetW, sheetH, IW_SHEET_R, [0, 0, 0, 0.34]);
 
     // — la FEUILLE BLANCHE —
-    fillRect(offX, offY, sheetW, sheetH, g.newBrush(g.BrushType.SOLID_COLOR, [1, 1, 1, 1]));
-    strokeRect(offX, offY, sheetW, sheetH,
-               g.newPen(g.PenType.SOLID_COLOR, [0.45, 0.45, 0.5, 1], 1));
+    iwFillRound(g, offX, offY, sheetW, sheetH, IW_SHEET_R, [1, 1, 1, 1]);
+    iwStrokeRound(g, offX, offY, sheetW, sheetH, IW_SHEET_R, [0.62, 0.64, 0.70, 1], 1);
 
     // — zone utile (marges) : rectangle tireté bleu vif —
-    var marginPen = g.newPen(g.PenType.SOLID_COLOR, [0.20, 0.50, 0.95, 1], 1);
+    var marginPen = g.newPen(g.PenType.SOLID_COLOR, [0.20, 0.50, 0.95, 1], 1.4);
     iwDashRect(g, marginPen, PX(zone.left), PY(zone.top), zone.w * sc, zone.h * sc, 5);
 
     // — pinceaux/plumes des pièces (vives, bon contraste) —
     var okFill   = g.newBrush(g.BrushType.SOLID_COLOR, [0.62, 0.80, 1.0, 1]);  // bleu franc clair
     var badFill  = g.newBrush(g.BrushType.SOLID_COLOR, [1.0, 0.70, 0.66, 1]);  // corail
     var bleedFill = g.newBrush(g.BrushType.SOLID_COLOR, [0.72, 0.86, 1.0, 1]); // fond perdu (bleu clair)
-    var cutPen   = g.newPen(g.PenType.SOLID_COLOR, [0.05, 0.05, 0.08, 1], 1.2); // coupe (noir)
-    var trimPen  = g.newPen(g.PenType.SOLID_COLOR, [0.65, 0.20, 0.80, 1], 1.2); // trim (violet)
-    var regPen   = g.newPen(g.PenType.SOLID_COLOR, [0.0, 0.70, 0.70, 1], 1.2);  // mire/angle (cyan = mire du document)
-    var regFilePen = g.newPen(g.PenType.SOLID_COLOR, [1.0, 0.55, 0.0, 1], 1.4); // mire PERSO (orange vif = remplace le document)
-    var pageCtrPen = g.newPen(g.PenType.SOLID_COLOR, [0.95, 0.15, 0.55, 1], 1.6); // centre page (magenta)
+    var cutPen   = g.newPen(g.PenType.SOLID_COLOR, [0.05, 0.05, 0.08, 1], 1.8); // coupe (noir)
+    var trimPen  = g.newPen(g.PenType.SOLID_COLOR, [0.65, 0.20, 0.80, 1], 1.6); // trim (violet)
+    var regPen   = g.newPen(g.PenType.SOLID_COLOR, [0.0, 0.70, 0.70, 1], 1.6);  // mire/angle (cyan = mire du document)
+    var regFilePen = g.newPen(g.PenType.SOLID_COLOR, [1.0, 0.55, 0.0, 1], 1.8); // mire PERSO (orange vif = remplace le document)
+    var pageCtrPen = g.newPen(g.PenType.SOLID_COLOR, [0.95, 0.15, 0.55, 1], 2.0); // centre page (magenta)
     var labelPen = g.newPen(g.PenType.SOLID_COLOR, [0.10, 0.20, 0.45, 1], 1);
     var wmBorderFill = g.newBrush(g.BrushType.SOLID_COLOR, [0.99, 0.96, 0.74, 1]); // cadre blanc tournant (jaune pâle)
-    var wmEdgePen = g.newPen(g.PenType.SOLID_COLOR, [0.78, 0.68, 0.30, 1], 1.4);   // bord du cadre / image réduite
+    var wmEdgePen = g.newPen(g.PenType.SOLID_COLOR, [0.78, 0.68, 0.30, 1], 1.8);   // bord du cadre / image réduite
     var pieceFill = L.overflow ? badFill : okFill;
     // V10 — pièce RETOURNÉE (180°) : teinte lilas distincte (sauf overflow,
     // qui reste corail pour signaler le problème en priorité).
@@ -5147,7 +5237,7 @@ function iwDrawPreview(canvas, L, zone, pageWH, marks, zoom, pan) {
 
     // épaisseur des traits de repère DANS L'APERÇU, reflétant le mode :
     //   Riso (6) = fin ; Sérigraphie (7) = épais. Purement visuel ici.
-    var mkW = 1.2;
+    var mkW = 1.7;
     if (L.mode === 6) mkW = 0.7;
     else if (L.mode === 7) mkW = 2.4;
     var cutPenMk = g.newPen(g.PenType.SOLID_COLOR, [0.05, 0.05, 0.08, 1], mkW);
@@ -5746,10 +5836,12 @@ function iwCalibrateScreen(curPxPerMM) {
         // épais + un remplissage bleu très léger pour rester visible sur fond clair.
         var wpx = cardPx, hpx = wpx * (CARD_H_MM / CARD_W_MM);
         var x = (W - wpx) / 2, y = (H - hpx) / 2;
-        g.newPath(); g.rectPath(x, y, wpx, hpx);
-        g.fillPath(g.newBrush(g.BrushType.SOLID_COLOR, [0.20, 0.45, 0.95, 0.12]));
-        g.newPath(); g.rectPath(x, y, wpx, hpx);
-        g.strokePath(g.newPen(g.PenType.SOLID_COLOR, [0.20, 0.45, 0.95, 1], 2.5));
+        // V2 — arrondi proportionnel au vrai rayon d'une carte ISO/IEC 7810
+        // (3,18 mm sur 85,6 mm de large) : le rectangle se superpose donc
+        // exactement à la carte que l'on pose sur l'écran pour calibrer.
+        var cardR = wpx * (3.18 / CARD_W_MM);
+        iwFillRound(g, x, y, wpx, hpx, cardR, [0.20, 0.45, 0.95, 0.12]);
+        iwStrokeRound(g, x, y, wpx, hpx, cardR, [0.20, 0.45, 0.95, 1], 2.5);
         // petit repère central pour aligner précisément
         g.newPath(); g.moveTo(W / 2, y); g.lineTo(W / 2, y + hpx);
         g.strokePath(g.newPen(g.PenType.SOLID_COLOR, [0.20, 0.45, 0.95, 0.5], 1));
@@ -5881,8 +5973,7 @@ function iwPickPresetColor(currentHex) {
     wheelPanel.onDraw = function () {
         var g = this.graphics;
         var W = this.size[0], Hh = this.size[1];
-        g.newPath(); g.rectPath(0, 0, W, Hh);
-        g.fillPath(g.newBrush(g.BrushType.SOLID_COLOR, [0.16, 0.17, 0.21, 1]));
+        iwFillRound(g, 0, 0, W, Hh, 6, [0.16, 0.17, 0.21, 1]);
         var geom = wheelGeom();
         var cx = geom.cx, cy = geom.cy, R = geom.R;
         // roue : on remplit par anneaux (saturation) et secteurs (teinte).
@@ -5963,10 +6054,8 @@ function iwPickPresetColor(currentHex) {
     swatchPanel.onDraw = function () {
         var g = this.graphics; var W = this.size[0], Hh = this.size[1];
         var rgb = iwHSVtoRGB(H, S, V);
-        g.newPath(); g.rectPath(0, 0, W, Hh);
-        g.fillPath(g.newBrush(g.BrushType.SOLID_COLOR, [rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, 1]));
-        g.newPath(); g.rectPath(0, 0, W, Hh);
-        g.strokePath(g.newPen(g.PenType.SOLID_COLOR, [0.45, 0.45, 0.5, 1], 1));
+        iwFillRound(g, 0, 0, W, Hh, 6, [rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, 1]);
+        iwStrokeRound(g, 0.5, 0.5, W - 1, Hh - 1, 6, [0.45, 0.45, 0.5, 1], 1);
     };
     function redrawSwatch() {
         var ok = false;
@@ -6425,13 +6514,17 @@ function mainV2(initialConfig) {
     if (IW_BODY_H < 380) IW_BODY_H = 380;
     // hauteur du canvas d'aperçu : le corps, moins ce qui l'entoure dans sa
     // colonne (ligne d'info pièce, deux rangées de zoom, résumé, marges).
-    var IW_PREVIEW_CHROME = 150;
+    //  V2 — l'aperçu est la pièce maîtresse de la fenêtre : c'est là qu'on
+    //  lit ce qui va sortir. On lui donne donc la place, et on ne laisse
+    //  autour de lui que ce qui est réellement nécessaire (ligne d'info,
+    //  rangées de zoom, résumé) — d'où un « chrome » resserré.
+    var IW_PREVIEW_CHROME = 122;
     var IW_CANVAS_H = IW_BODY_H - IW_PREVIEW_CHROME;
-    if (IW_CANVAS_H < 260) IW_CANVAS_H = 260;
-    // largeur du canvas : ~35% de la largeur écran, bornée
-    var IW_CANVAS_W = Math.round(IW_SCREEN_W * 0.35);
-    if (IW_CANVAS_W < 300) IW_CANVAS_W = 300;
-    if (IW_CANVAS_W > 700) IW_CANVAS_W = 700;
+    if (IW_CANVAS_H < 300) IW_CANVAS_H = 300;
+    // largeur du canvas : ~44% de la largeur écran, bornée
+    var IW_CANVAS_W = Math.round(IW_SCREEN_W * 0.44);
+    if (IW_CANVAS_W < 360) IW_CANVAS_W = 360;
+    if (IW_CANVAS_W > 900) IW_CANVAS_W = 900;
     var IW_TABS_MAX_H = IW_BODY_H;
     var IW_NAV_W = 132;    // largeur de la colonne de sections
     // Trois colonnes côte à côte élargissent la fenêtre : sur un écran étroit,
@@ -6440,9 +6533,19 @@ function mainV2(initialConfig) {
     // — c'est elle qui supporte le mieux d'être resserrée, ses champs étant
     // alignés sur une colonne de libellés fixe.
     var IW_CONTENT_W = 560;
-    var _availW = IW_SCREEN_W - 60 - IW_NAV_W - IW_CANVAS_W - 40;
+    var IW_CHROME_W  = 100;   // marges de la fenêtre + gouttières des colonnes
+    var _availW = IW_SCREEN_W - IW_CHROME_W - IW_NAV_W - IW_CANVAS_W;
     if (_availW < IW_CONTENT_W) IW_CONTENT_W = _availW;
-    if (IW_CONTENT_W < 420) IW_CONTENT_W = 420;
+    if (IW_CONTENT_W < 420) {
+        // La colonne des réglages ne descend pas sous 420 px : en dessous, les
+        // champs passent sous leur colonne de libellés. C'est alors l'APERÇU
+        // qui rend le reste — mieux vaut un aperçu plus petit que des réglages
+        // illisibles ou une fenêtre plus large que l'écran.
+        IW_CONTENT_W = 420;
+        var _over = IW_NAV_W + IW_CONTENT_W + IW_CANVAS_W + IW_CHROME_W - IW_SCREEN_W;
+        if (_over > 0) IW_CANVAS_W -= _over;
+        if (IW_CANVAS_W < 300) IW_CANVAS_W = 300;
+    }
 
     // ══ V2 — TYPE DE DOCUMENT, EN TÊTE DE FENÊTRE ══════════════════════
     //  Réglage de tête, placé hors des sections et sur TOUTE LA LARGEUR
@@ -6695,18 +6798,18 @@ function mainV2(initialConfig) {
                 var cd = ALIGN_CODES[r][c];
                 var x = IW_ALIGN_PAD + c * cw, y = IW_ALIGN_PAD + r * ch;
                 if (cd === alignHoverCode && cd !== currentAlign) {
-                    g.newPath(); g.rectPath(x, y, cw, ch);
-                    g.fillPath(g.newBrush(g.BrushType.SOLID_COLOR, hoverCol));
+                    iwFillRound(g, x + 1, y + 1, cw - 2, ch - 2, 3, hoverCol);
                 }
                 // la « pièce » : un carré posé dans le coin que décrit le code
                 var pw = cw * 0.46, ph = ch * 0.46;
                 var px = x + (c === 0 ? cw * 0.12 : (c === 1 ? (cw - pw) / 2 : cw - pw - cw * 0.12));
                 var py = y + (r === 0 ? ch * 0.12 : (r === 1 ? (ch - ph) / 2 : ch - ph - ch * 0.12));
-                g.newPath(); g.rectPath(px, py, pw, ph);
+                // la « pièce » elle-même est arrondie (rayon 2) : à cette
+                // taille, un coin franc se lit comme un défaut de tracé.
                 if (cd === currentAlign) {
-                    g.fillPath(g.newBrush(g.BrushType.SOLID_COLOR, activeCol));
+                    iwFillRound(g, px, py, pw, ph, 2, activeCol);
                 } else {
-                    g.strokePath(g.newPen(g.PenType.SOLID_COLOR, lineCol, 1));
+                    iwStrokeRound(g, px, py, pw, ph, 2, lineCol, 1);
                 }
             }
         }
@@ -6723,8 +6826,8 @@ function mainV2(initialConfig) {
             g.lineTo(W - IW_ALIGN_PAD, IW_ALIGN_PAD + k * ch);
             g.strokePath(gridPen);
         }
-        g.newPath(); g.rectPath(IW_ALIGN_PAD, IW_ALIGN_PAD, W - IW_ALIGN_PAD * 2, H - IW_ALIGN_PAD * 2);
-        g.strokePath(g.newPen(g.PenType.SOLID_COLOR, lineCol, 1));
+        iwStrokeRound(g, IW_ALIGN_PAD, IW_ALIGN_PAD,
+                      W - IW_ALIGN_PAD * 2, H - IW_ALIGN_PAD * 2, 4, lineCol, 1);
     };
     function refreshAlignButtons() {
         // le nom est conservé : il est appelé depuis applyConfig, le bouton
@@ -7444,20 +7547,19 @@ function mainV2(initialConfig) {
                 // preset sans couleur -> pas de fond (transparent), texte BLANC
             }
             if (bg) {
-                g.newPath(); g.rectPath(2, rowTop, W - 4, IW_ROW_H - 1);
-                g.fillPath(g.newBrush(g.BrushType.SOLID_COLOR, bg));
+                // V2 — coins arrondis (rayon 4) : la ligne colorée devient une
+                // pastille, comme les étiquettes de couleur d'InDesign.
+                iwFillRound(g, 2, rowTop, W - 4, IW_ROW_H - 1, 4, bg);
             }
             // V12 — survol : léger voile par-dessus la ligne survolée
             //   (V2 : assombri en thème clair, où un voile blanc ne se voit pas)
             if (idx === presetHoverIdx && !isSel) {
-                g.newPath(); g.rectPath(2, rowTop, W - 4, IW_ROW_H - 1);
-                g.fillPath(g.newBrush(g.BrushType.SOLID_COLOR,
-                    IW_UI_DARK ? [1, 1, 1, 0.12] : [0, 0, 0, 0.10]));
+                iwFillRound(g, 2, rowTop, W - 4, IW_ROW_H - 1, 4,
+                    IW_UI_DARK ? [1, 1, 1, 0.12] : [0, 0, 0, 0.10]);
             }
             // sélection : liseré contrasté (V14 : blanc ; V2 : suit le thème)
             if (isSel) {
-                g.newPath(); g.rectPath(2, rowTop, W - 4, IW_ROW_H - 1);
-                g.strokePath(g.newPen(g.PenType.SOLID_COLOR, IW_TXT_DEFAULT, 2));
+                iwStrokeRound(g, 2, rowTop, W - 4, IW_ROW_H - 1, 4, IW_TXT_DEFAULT, 2);
             }
             // texte
             var pen = g.newPen(g.PenType.SOLID_COLOR, txt, 1);
@@ -7474,8 +7576,7 @@ function mainV2(initialConfig) {
             try { g.drawString(label, pen, 8, rowTop + 5); } catch (eDs) {}
         }
         // cadre fin (toujours utile pour délimiter la zone)
-        g.newPath(); g.rectPath(0, 0, W, H);
-        g.strokePath(g.newPen(g.PenType.SOLID_COLOR, [0.45, 0.45, 0.5, 0.6], 1));
+        iwStrokeRound(g, 0.5, 0.5, W - 1, H - 1, 6, [0.45, 0.45, 0.5, 0.6], 1);
     };
     function redrawPresetPanel() {
         var ok = false;
