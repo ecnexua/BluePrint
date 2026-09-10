@@ -1,0 +1,7 @@
+# Artefacts d'outils d'analyse — index et graphes régénérables,
+# sans rapport avec le script livré.
+.serena/
+graphify-out/
+
+# macOS
+.DS_Store
