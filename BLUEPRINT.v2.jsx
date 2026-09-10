@@ -59,6 +59,41 @@
 //      • Garde-fou d'écran étroit : trois colonnes côte à côte élargissent la
 //        fenêtre ; la colonne des réglages se resserre en premier (jusqu'à
 //        420 px) pour que celle de droite ne sorte pas de l'écran.
+//    Mires plafonnées à 4 mm, légende retirée, paramètres morts supprimés
+//      • DIAMÈTRE DES MIRES borné à 4 mm (IW_REG_MAX_MM). La taille était le
+//        produit « longueur de repère × multiplicateur », soit 7 × 2,4 =
+//        16,8 mm par défaut : une mire plus large qu'un repère de coupe cesse
+//        d'être un point de visée et devient un objet graphique qui déborde
+//        des marges. Le plafond est appliqué par UNE fonction partagée
+//        (iwRegDiam), donc identiquement dans le moteur et dans l'aperçu — 7
+//        sites de calcul.
+//      • Le multiplicateur « Mires centre/bord (×) » devient un DIAMÈTRE EN MM
+//        (1 à 4). Une fois le plafond posé, tout multiplicateur au-dessus de
+//        0,57 donnait le même résultat : le réglage ne réglait plus rien.
+//      • BANDEAU LÉGENDE supprimé sous la feuille. Il énumérait en toutes
+//        lettres les repères actifs (« fond perdu · coupe · centre page… »),
+//        c'est-à-dire ce que les cases à cocher montrent déjà et ce que le
+//        dessin montre lui-même — une ligne de hauteur pour redire deux fois
+//        ce qui était visible.
+//    Paramètres NON FONCTIONNELS supprimés
+//      • `cornerMult` : stocké, transmis au moteur et aux marques, mais plus
+//        jamais utilisé pour dessiner — les mires de COIN ont été retirées en
+//        v4 et le réglage a survécu à ce qu'il pilotait.
+//      • `colorNamePt` : idem, son propre commentaire disait « (hérité) le nom
+//        est désormais fixé à 8 pt ».
+//      • PANNEAU « Pré-traitement des pages » retiré de l'interface : cinq
+//        champs qui ne produisaient rien (le plan de pages est calculé dans
+//        iwExecute puis jamais relu). Les contrôles restent déclarés hors
+//        interface pour que gatherConfig/applyConfig et les presets déjà
+//        enregistrés continuent de fonctionner sans cas particulier.
+//    Compréhension des panneaux
+//      • Les titres disent CE QUI EST PRODUIT, plus la mécanique interne.
+//        « Repères de pièce » / « Repères de page » ne disaient pas la seule
+//        différence qui compte — sur CHAQUE copie posée, ou UNE FOIS sur la
+//        feuille — et c'est maintenant leur titre. De même : « Destination »
+//        -> « Sur quelle page imposer », « Répétition » -> « Combien de
+//        copies », « Alignement de la grille » -> « Où poser la grille sur la
+//        feuille », « Marques couleurs » -> « Pastilles des encres utilisées ».
 //    Aperçu plus grand, plus lisible, et COINS ARRONDIS
 //      • L'aperçu passe de 35 % à 44 % de la largeur d'écran (plafond 700 ->
 //        900 px), sa marge interne de 26 à 16 px, et le bandeau de contrôles
@@ -915,7 +950,7 @@ var I18N = {
     tab_settings:     { fr: "Réglages",                        en: "Settings",                       it: "Impostazioni" },
     // onglet mode
     lbl_mode:         { fr: "Mode :",                         en: "Mode:",                          it: "Modalità:" },
-    panel_dest:       { fr: "Destination",                    en: "Destination",                    it: "Destinazione" },
+    panel_dest:       { fr: "Sur quelle page imposer",        en: "Which page to impose on",        it: "Su quale pagina imporre" },
     lbl_page:         { fr: "Page cible :",                   en: "Target page:",                   it: "Pagina di destinazione:" },
     desc_page:        { fr: "Page du document où poser l'imposition (1 à %N%).",
                         en: "Document page where the imposition is placed (1 to %N%).",
@@ -930,7 +965,7 @@ var I18N = {
                         en: "The number of pieces is computed automatically from the piece size, the usable area and the exact spacing (Marks tab).",
                         it: "Il numero di pezzi è calcolato automaticamente in base alla dimensione del pezzo, all'area utile e alla spaziatura esatta (scheda Crocini)." },
     // bloc répétition
-    panel_rep:        { fr: "Répétition",                     en: "Repetition",                     it: "Ripetizione" },
+    panel_rep:        { fr: "Combien de copies",              en: "How many copies",                it: "Quante copie" },
     cb_auto:          { fr: "Auto",                           en: "Auto",                           it: "Auto" },
     lbl_count:        { fr: "Nombre de pièces :",             en: "Number of pieces:",              it: "Numero di pezzi:" },
     cb_fit:           { fr: "Autoriser le redimensionnement proportionnel",
@@ -943,7 +978,7 @@ var I18N = {
                         en: "Auto = as many pieces as the area allows, at their native size. Uncheck Auto to target an exact TOTAL; the best-proportioned grid is chosen. Resizing scales the pieces (ratio kept) to best fill the area. Every other row: even rows (2, 4, …) are turned head-to-foot.",
                         it: "Auto = tutti i pezzi che l'area consente, alla dimensione originale. Deseleziona Auto per puntare a un TOTALE preciso; viene scelta la griglia meglio proporzionata. Il ridimensionamento scala i pezzi (mantiene il rapporto) per riempire al meglio l'area. Una riga sì e una no: le righe pari (2, 4, …) sono ruotate testa-piede." },
     // alignement
-    panel_align:      { fr: "Alignement de la grille",        en: "Grid alignment",                 it: "Allineamento della griglia" },
+    panel_align:      { fr: "Où poser la grille sur la feuille", en: "Where to place the grid on the sheet", it: "Dove posare la griglia sul foglio" },
     desc_align:       { fr: "Position de la grille dans la zone utile (intérieur des marges). Le bouton central = centré. Sans effet si la grille remplit toute la zone.",
                         en: "Position of the grid within the usable area (inside the margins). The center button = centered. No effect if the grid fills the whole area.",
                         it: "Posizione della griglia nell'area utile (entro i margini). Il pulsante centrale = centrato. Nessun effetto se la griglia riempie tutta l'area." },
@@ -993,11 +1028,11 @@ var I18N = {
                         it: "Nessuna selezione — anteprima di prova (100 × 150 mm)" },
     panel_spacing:    { fr: "Espacement entre pièces",        en: "Spacing between pieces",         it: "Spaziatura tra i pezzi" },
     panel_bleed:      { fr: "Fond perdu",                     en: "Bleed",                          it: "Abbondanza" },
-    panel_piecemarks: { fr: "Repères de pièce",               en: "Piece marks",                    it: "Crocini pezzo" },
-    panel_pagemarks:  { fr: "Repères de page",                en: "Page marks",                     it: "Crocini pagina" },
-    panel_markstyle:  { fr: "Style des traits",               en: "Stroke style",                   it: "Stile dei tratti" },
-    panel_customtxt2: { fr: "Texte & graphique",              en: "Text & graphic",                 it: "Testo e grafica" },
-    panel_colormarks: { fr: "Marques couleurs",               en: "Color marks",                    it: "Tacche colore" },
+    panel_piecemarks: { fr: "Sur chaque copie posée",         en: "On every placed copy",           it: "Su ogni copia posata" },
+    panel_pagemarks:  { fr: "Une fois sur la feuille",        en: "Once on the sheet",              it: "Una volta sul foglio" },
+    panel_markstyle:  { fr: "Épaisseur et longueur des traits", en: "Stroke weight and length",     it: "Spessore e lunghezza dei tratti" },
+    panel_customtxt2: { fr: "Ajouter un texte ou un logo",    en: "Add a text or a logo",           it: "Aggiungi un testo o un logo" },
+    panel_colormarks: { fr: "Pastilles des encres utilisées", en: "Swatches of the inks used",      it: "Tacche degli inchiostri usati" },
     lbl_wm_color:     { fr: "Couleur du fond :",              en: "Fill color:",                    it: "Colore di sfondo:" },
     wm_color_none:    { fr: "Aucune (blanc)",                 en: "None (white)",                   it: "Nessuno (bianco)" },
     tip_wm_color:     { fr: "Remplit le blanc tournant avec une nuance du document (passe-partout coloré). « Aucune » = blanc du papier.",
@@ -1262,7 +1297,7 @@ var I18N = {
     tip_colornameside:{ fr: "Choisit de quel côté est le BAS du texte sur les rectangles de couleur. Auto = horizontal en bord court, tourné à 90° en bord long.",
                         en: "Chooses which side is the BOTTOM of the text on the color rectangles. Auto = horizontal on short edge, rotated 90° on long edge.",
                         it: "Sceglie da quale lato è la BASE del testo sui rettangoli colore. Auto = orizzontale su lato corto, ruotato 90° su lato lungo." },
-    panel_whitemargin:{ fr: "Blanc tournant (marge interne)",  en: "Inner white margin",             it: "Margine bianco interno" },
+    panel_whitemargin:{ fr: "Blanc tournant — marge autour du visuel", en: "Inner margin — border around the artwork", it: "Margine interno — bordo attorno alla grafica" },
     lbl_wm_top:       { fr: "Haut :",                         en: "Top:",                           it: "Alto:" },
     lbl_wm_bottom:    { fr: "Bas :",                          en: "Bottom:",                        it: "Basso:" },
     lbl_wm_left:      { fr: "Gauche :",                       en: "Left:",                          it: "Sinistra:" },
@@ -1385,8 +1420,14 @@ var I18N = {
     tip_showdims:     { fr: "Trace les dimensions (l × h) et les lignes de cote dans l'aperçu.",
                         en: "Draws dimensions (w × h) and dimension lines in the preview.",
                         it: "Disegna le quote (l × a) e le linee di quota nell'anteprima." },
-    panel_advanced:   { fr: "Repères et couleurs (avancé)",    en: "Marks and colors (advanced)",    it: "Crocini e colori (avanzato)" },
-    lbl_centermult:   { fr: "Mires centre/bord (×) :",         en: "Center/edge marks (×):",         it: "Mire centro/bordo (×):" },
+    panel_advanced:   { fr: "Taille des mires et des pastilles", en: "Size of marks and swatches",   it: "Dimensione di mire e tacche" },
+    // V2 — le multiplicateur devient un DIAMÈTRE EN MM, borné à 4.
+    lbl_regdiam:      { fr: "Diamètre des mires (mm, max 4) :",
+                        en: "Registration mark diameter (mm, max 4):",
+                        it: "Diametro delle mire (mm, max 4):" },
+    tip_regdiam:      { fr: "Diamètre des mires de calage, en millimètres. Plafonné à 4 mm : au-delà, une mire cesse d'être un point de visée et devient un objet graphique qui déborde des marges. Remplace l'ancien multiplicateur « × longueur de repère », devenu sans effet une fois le plafond appliqué.",
+                        en: "Diameter of registration marks, in millimetres. Capped at 4 mm: beyond that a mark stops being an aiming point and becomes a graphic object that overflows the margins. Replaces the former \"× mark length\" multiplier, which had no effect once the cap applied.",
+                        it: "Diametro delle mire di registro, in millimetri. Limitato a 4 mm: oltre, una mira smette di essere un punto di mira e diventa un oggetto grafico che deborda dai margini. Sostituisce il precedente moltiplicatore « × lunghezza crocino », divenuto ininfluente una volta applicato il limite." },
     tip_centermult:   { fr: "Taille des mires de centre et de bord (× longueur). Défaut 2.4.",
                         en: "Size of center and edge marks (× length). Default 2.4.",
                         it: "Dimensione mire centro e bordo (× lunghezza). Default 2.4." },
@@ -1809,6 +1850,27 @@ function iwStrokeCircle(g, cx, cy, r, rgba, w) {
 //  système et gardent leurs angles — ScriptUI n'expose aucun moyen de les
 //  redessiner.
 // ─────────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────
+//  V2 — DIAMÈTRE MAXIMAL D'UNE MIRE DE REPÉRAGE : 4 mm.
+//  La taille était le produit « longueur de repère × multiplicateur », soit
+//  7 × 2,4 = 16,8 mm par défaut — une mire plus large qu'un repère de coupe
+//  n'est plus une mire, elle devient un objet graphique qui écrase la
+//  planche et déborde des marges. En calage riso/sérigraphie, une mire se
+//  vise au centre : au-delà de quelques millimètres elle perd en précision
+//  au lieu d'en gagner.
+//  Le plafond s'applique au MOTEUR et à l'APERÇU par la même fonction, pour
+//  que ce qui est dessiné soit ce qui sera posé.
+// ─────────────────────────────────────────────────────────────────────
+var IW_REG_MAX_MM = 4;   // diamètre maximal d'une mire, en millimètres
+
+function iwRegDiam(mm) {
+    var d = parseFloat(mm);
+    if (!isFinite(d) || d <= 0) d = IW_REG_MAX_MM;
+    if (d > IW_REG_MAX_MM) d = IW_REG_MAX_MM;
+    if (d < 1) d = 1;
+    return d;
+}
+
 var IW_ROUND_SEG = 4;   // segments par quart de cercle
 
 function iwRoundRectPts(x, y, w, h, r) {
@@ -2976,7 +3038,7 @@ function addPageCenterMarks(page, layer, pageBounds, opts) {
     // taille : comme les croix de bord mais PLUS GROSSE (×2.4),
     // bornée à l'épaisseur de marge pour ne pas mordre la zone utile.
     var baseLen = (opts && opts.length != null) ? opts.length : 7;
-    var wantLen = baseLen * ((opts && opts.centerMult != null) ? opts.centerMult : 2.4);
+    var wantLen = iwRegDiam(opts && opts.regDiam);
     function clampToMargin(mt) {
         var maxByMargin = (mt > 0) ? mt * 0.9 : wantLen;
         var L = Math.min(wantLen, maxByMargin);
@@ -4435,7 +4497,7 @@ function addPageColorMarks(page, layer, pageBounds, usedColors, opts) {
     //   "trou" laisse la croix visible).
     var rsvOn = !!(opts && opts.pageCenterOn);
     var cxC = (l + r) / 2;
-    var centerLen = ((opts && opts.length) || 7) * ((opts && opts.centerMult != null) ? opts.centerMult : 2.4);
+    var centerLen = iwRegDiam(opts && opts.regDiam);
     function mireHalf(mt) { var mx = (mt > 0) ? mt * 0.9 : centerLen; return Math.min(centerLen, mx) / 2 + 2; } // +2 mm
     var rsvBotHalf = mireHalf(m.bottom), rsvTopHalf = mireHalf(m.top);
     function skipCenter(x, w, half) {
@@ -4476,7 +4538,7 @@ function addPageColorMarks(page, layer, pageBounds, usedColors, opts) {
     //   les mires de coin (et garder les coins lisibles). On calcule, pour
     //   chaque bord, la plage utile [lo,hi] en retirant, à chaque extrémité,
     //   le rayon de la mire de coin + un petit jeu (crossCornerGap).
-    var cmLen = ((opts && opts.length) || 7) * ((opts && opts.centerMult != null) ? opts.centerMult : 2.4);
+    var cmLen = iwRegDiam(opts && opts.regDiam);
     function clampMargC(mt) { var mx = (mt > 0) ? mt * 0.9 : cmLen; var Lz = Math.min(cmLen, mx); return (Lz < 3) ? 3 : Lz; }
     function cMireLen(a, bb) { var aa = (a > 0) ? a : 99999, b2 = (bb > 0) ? bb : 99999; return clampMargC(Math.min(aa, b2)); }
     var cornerGapC = (opts && opts.crossCornerGap != null) ? opts.crossCornerGap : 6;
@@ -5472,7 +5534,7 @@ function iwDrawPreview(canvas, L, zone, pageWH, marks, zoom, pan) {
     //   marge, un peu plus GROSSES que les croix de bord (×1.8). + croix
     //   exacte au centre de la feuille (optionnelle).
     if (marks && marks.pageCenter) {
-        var wantRc = (marks.len ? marks.len : 7) * ((marks.centerMult||2.4)) * sc;
+        var wantRc = iwRegDiam(marks.regDiam) * sc;
         if (marks.pageCross) {
             var lc2 = wantRc / 2; if (lc2 < 6) lc2 = 6;
             line(pcx - lc2, pcy, pcx + lc2, pcy, pageCtrPen);
@@ -5528,7 +5590,7 @@ function iwDrawPreview(canvas, L, zone, pageWH, marks, zoom, pan) {
             var pvColorEdgeC = (marks && marks.colorEdge === "long") ? "long" : "short";
             var pvWantHC = (pvColorEdgeC === "long") ? !pvIsPortraitC : pvIsPortraitC;
             var pvGapHalfPx = (marks && marks.pageCenter)
-                ? ((marks.len ? marks.len : 7) * (marks.centerMult || 2.4) * sc / 2 + 2 * sc) : 0;
+                ? (iwRegDiam(marks.regDiam) * sc / 2 + 2 * sc) : 0;
             function centeredPx(n, itemPx, center, gapHalf) {
                 var leftN = Math.floor(n / 2), rightN = n - leftN;
                 return { lo: center - gapHalf - leftN * itemPx, hi: center + gapHalf + rightN * itemPx };
@@ -5582,7 +5644,7 @@ function iwDrawPreview(canvas, L, zone, pageWH, marks, zoom, pan) {
         var txtPen = g.newPen(g.PenType.SOLID_COLOR, [1, 1, 1, 1], 1); // nom blanc (défonce)
         // trou pour ne pas masquer la mire de centre (cohérent avec l'impression)
         var pcCx = offX + sheetW / 2;
-        var pvMireHalf = (marks.len ? marks.len : 7) * ((marks.centerMult || 2.4)) * sc / 2 + 2 * sc;
+        var pvMireHalf = iwRegDiam(marks.regDiam) * sc / 2 + 2 * sc;
         var pvRsvOn = !!marks.pageCenter;
         function pvSkipCenter(x, w) {
             if (!pvRsvOn) return x;
@@ -5603,7 +5665,7 @@ function iwDrawPreview(canvas, L, zone, pageWH, marks, zoom, pan) {
         // dégagement des coins (px) : bornes utiles le long de chaque bord, en
         // retirant le rayon de la mire de coin + le jeu d'angle, pour ne pas
         // masquer les mires de coin.
-        var wantRcC = (marks.len ? marks.len : 7) * (marks.centerMult || 2.4) * sc;
+        var wantRcC = iwRegDiam(marks.regDiam) * sc;
         function radC(mpx) { var mx = (mpx > 0 ? mpx * 0.9 : wantRcC); var R = Math.min(wantRcC, mx) / 2; return R < 2 ? 2 : R; }
         var cgPx = (marks.crossCornerGap || 6) * sc;
         var axLpx = offX + mLeftPx / 2, axRpx = offX + sheetW - mRightPx / 2;
@@ -5702,24 +5764,12 @@ function iwDrawPreview(canvas, L, zone, pageWH, marks, zoom, pan) {
         }
     }
 
-    // — bandeau légende en bas de l'aperçu —
-    try {
-        var leg = [];
-        if (marks) {
-            if (marks.crop) leg.push("coupe");
-            if (marks.trim) leg.push("trim");
-            if (marks.reg) leg.push("mire");
-            if (marks.bar)  leg.push("CMJN");
-            if (marks.ang)  leg.push("angle");
-            if (marks.pageCenter) leg.push(hasRegFile ? "centre page (perso)" : "centre page");
-            if (marks.sideCross) leg.push(hasRegFile ? "croix bords (perso)" : "croix bords");
-            if (marks.colorMarks) leg.push(L.mode === 6 ? "couleurs (noms)" : "couleurs");
-        }
-        if (bleed > 0) leg.unshift("fond perdu");
-        var legTxt = leg.length ? leg.join(" \u00B7 ") : "";
-        if (legTxt) g.drawString(legTxt,
-            g.newPen(g.PenType.SOLID_COLOR, [0.80, 0.82, 0.88, 1], 1), offX, offY + sheetH + 10);
-    } catch (eLeg) {}
+    // — V2 : le BANDEAU LÉGENDE sous la feuille est SUPPRIMÉ.
+    //   Il énumérait en toutes lettres les repères actifs (« fond perdu ·
+    //   coupe · centre page · croix bords · couleurs »), c'est-à-dire
+    //   exactement ce que les cases à cocher de l'onglet Repères montrent
+    //   déjà — et ce que le dessin lui-même montre. Il volait une ligne de
+    //   hauteur sous la feuille pour redire ce qui était visible deux fois.
 
     // — COTES / MESURES (V4) : lignes de cote sur le bord HAUT (largeur) et
     //   le bord GAUCHE (hauteur), avec ticks d'extrémité, + une étiquette
@@ -7304,29 +7354,27 @@ function mainV2(initialConfig) {
     duplexState();
 
     // — Pré-traitement des pages (anciennement onglet séparé) —
-    var pPre = tDup.add("panel", undefined, tr("panel_preprocess"));
-    pPre.orientation = "column"; pPre.alignChildren = "fill"; pPre.margins = 8; pPre.spacing = 4;
-    var preWarn = pPre.add("statictext", undefined, tr("warn_preprocess"), { multiline: true });
-    preWarn.preferredSize = [460, 44];
-    try {
-        preWarn.graphics.foregroundColor = preWarn.graphics.newPen(
-            preWarn.graphics.PenType.SOLID_COLOR, [0.85, 0.45, 0.10, 1], 1);
-    } catch (ePw) {}
-    var preIntro = pPre.add("statictext", undefined,
-        tr("tip_preprocess"),
-        { multiline: true });
-    preIntro.preferredSize = [460, 42];
-    iwItalic(preIntro);
-    var ppReorderIn = field(pPre, tr("lbl_ppreorder"), "",
-        tr("tip_pporder"), 140);
-    var ppCloneIn   = field(pPre, tr("lbl_ppclone"), "1",
-        tr("tip_pprepeat"));
-    var ppDelIn     = field(pPre, tr("lbl_ppdel"), "",
-        tr("tip_ppskip"));
-    var ppDupRow = pPre.add("group");
-    ppDupRow.add("statictext", undefined, tr("lbl_ppduppage")).preferredSize.width = IW_UI_LABEL_W;
-    var ppDupPg = ppDupRow.add("edittext", undefined, ""); ppDupPg.preferredSize.width = 50;
-    var ppDupN  = ppDupRow.add("edittext", undefined, "1"); ppDupN.preferredSize.width = 50;
+    // ── V2 — LE PANNEAU « PRÉ-TRAITEMENT DES PAGES » EST SUPPRIMÉ ───────
+    //  Il proposait de réordonner, cloner, supprimer et dupliquer des pages.
+    //  Vérification faite dans iwExecute : le plan de pages est bien calculé à
+    //  partir de ces champs (ppReorder / ppClone / ppDeletePage /
+    //  ppDuplicatePage), puis la variable `plan` n'est JAMAIS relue — baseCfg
+    //  ne la référence pas. Cinq champs qui ne produisaient rien, avec un
+    //  avertissement qui annonçait à tort une modification du document.
+    //  Les contrôles restent déclarés, HORS INTERFACE, pour deux raisons :
+    //  gatherConfig/applyConfig continuent de les lire sans cas particulier,
+    //  et les presets déjà enregistrés gardent leur champ `pre` intact — le
+    //  jour où le plan sera raccordé au moteur, il n'y aura qu'à réafficher
+    //  le panneau.
+    var pPre = tDup.add("group");
+    pPre.orientation = "column";
+    pPre.visible = false;
+    try { pPre.preferredSize = [0, 0]; pPre.maximumSize = [0, 0]; } catch (ePz2) {}
+    var ppReorderIn = pPre.add("edittext", undefined, "");
+    var ppCloneIn   = pPre.add("edittext", undefined, "1");
+    var ppDelIn     = pPre.add("edittext", undefined, "");
+    var ppDupPg     = pPre.add("edittext", undefined, "");
+    var ppDupN      = pPre.add("edittext", undefined, "1");
 
     // V2 — « Recto/verso » est le seul onglet qui peut se vider entièrement
     //  (une affiche et un sticker n'ont ni verso ni pré-traitement de pages).
@@ -7718,13 +7766,19 @@ function mainV2(initialConfig) {
                  ? initialConfig.marks.regFile
                  : iwLoadRegMark(),  // mire mémorisée au démarrage
         // — PERSONNALISATION (durable, hors presets) —
-        cornerMult:      prefOr("cornerMult", 3.2),     // taille des mires de COIN (× longueur)
-        centerMult:      prefOr("centerMult", 2.4),     // taille des mires de centre/bord
+        // V2 — DIAMÈTRE DES MIRES en millimètres, plafonné à IW_REG_MAX_MM.
+        //   Remplace l'ancien MULTIPLICATEUR « × longueur de repère » : une
+        //   fois le diamètre plafonné à 4 mm, tout multiplicateur au-dessus de
+        //   0,57 donnait le même résultat — le réglage ne réglait plus rien.
+        //   `cornerMult` a disparu : les mires de COIN ont été retirées en v4,
+        //   le réglage était transporté partout sans plus rien dessiner.
+        regDiam:         iwRegDiam(prefOr("regDiam", IW_REG_MAX_MM)),
         crossCornerGap:  prefOr("crossCornerGap", 6),   // marge libre près des coins pour les croix de bord (mm)
         colorSwatchSize: prefOr("colorSwatchSize", 12), // côté du carré couleur (mm)
         colorBarW:       prefOr("colorBarW", 46),       // largeur du rectangle couleur (mm)
         colorBarH:       prefOr("colorBarH", 11),       // hauteur du rectangle couleur (mm)
-        colorNamePt:     prefOr("colorNamePt", 8),      // (hérité) le nom est désormais fixé à 8 pt blanc
+        // `colorNamePt` a disparu : le nom de couleur est fixé à 8 pt blanc
+        // depuis la v4, le réglage était mort.
         showDims:        prefOr("showDims", true),      // afficher les cotes dans l'aperçu
         previewTransparent: prefOr("previewTransparent", false), // fond de l'aperçu transparent
         screenPPI:       prefOr("screenPPI", 96)        // densité écran (px/pouce) pour l'affichage « taille réelle »
@@ -7790,7 +7844,7 @@ function mainV2(initialConfig) {
         // — REPÈRES & COULEURS (avancé) —
         var pCustom = sw.add("panel", undefined, tr("panel_advanced"));
         pCustom.orientation = "column"; pCustom.alignChildren = "left"; pCustom.margins = 8; pCustom.spacing = 4;
-        var sCenterMult = sfield(pCustom, tr("lbl_centermult"), String(settings.centerMult), tr("tip_centermult"));
+        var sRegDiam = sfield(pCustom, tr("lbl_regdiam"), String(settings.regDiam), tr("tip_regdiam"));
         var sCrossGap   = sfield(pCustom, tr("lbl_crossgap"), String(settings.crossCornerGap), tr("tip_crossgap"));
         var sColSq      = sfield(pCustom, tr("lbl_colsq"), String(settings.colorSwatchSize));
         var sColBarW    = sfield(pCustom, tr("lbl_colbarw"), String(settings.colorBarW));
@@ -7821,7 +7875,7 @@ function mainV2(initialConfig) {
         function numOr(s, d) { var v = parseFloat(s); return (isFinite(v) && v > 0) ? v : d; }
         settings.previewTransparent = !!sPrevTransp.value;
         settings.showDims        = !!sShowDims.value;
-        settings.centerMult      = numOr(sCenterMult.text, 2.4);
+        settings.regDiam         = iwRegDiam(numOr(sRegDiam.text, IW_REG_MAX_MM));
         settings.crossCornerGap  = numOr(sCrossGap.text, 6);
         settings.colorSwatchSize = numOr(sColSq.text, 12);
         settings.colorBarW       = numOr(sColBarW.text, 46);
@@ -7829,7 +7883,7 @@ function mainV2(initialConfig) {
         settings.screenPPI       = calPxPerMM * 25.4;
         iwSavePrefs({
             previewTransparent: settings.previewTransparent, showDims: settings.showDims,
-            centerMult: settings.centerMult, crossCornerGap: settings.crossCornerGap,
+            regDiam: settings.regDiam, crossCornerGap: settings.crossCornerGap,
             colorSwatchSize: settings.colorSwatchSize,
             colorBarW: settings.colorBarW, colorBarH: settings.colorBarH,
             screenPPI: settings.screenPPI
@@ -8121,10 +8175,10 @@ function mainV2(initialConfig) {
             txt: mkTxt.text || "",
             regFile: settings.regFile || "",
             // personnalisation (pour que l'aperçu reflète les réglages durables)
-            cornerMult: settings.cornerMult, centerMult: settings.centerMult,
+            regDiam: settings.regDiam,
             crossCornerGap: settings.crossCornerGap,
             colorSwatchSize: settings.colorSwatchSize, colorBarW: settings.colorBarW,
-            colorBarH: settings.colorBarH, colorNamePt: settings.colorNamePt,
+            colorBarH: settings.colorBarH,
             showDims: settings.showDims, previewTransparent: settings.previewTransparent
         };
     }
@@ -8512,7 +8566,7 @@ function mainV2(initialConfig) {
     var IW_DOCTYPES = [
         {   // 0 — CARTE DE VISITE : grille serrée, coupes partagées (gap 0).
             key: "card", mode: 0, desc: "desc_dt_card",
-            hide: ["pModeOpts", "pPre"],
+            hide: ["pModeOpts"],
             neutralize: function () { shufIn.text = ""; dtClearPre(); },
             setup: function () {
                 dtRepeat(true); dtGaps(0, 0); dtEdge("bleed", 3);
@@ -8525,7 +8579,7 @@ function mainV2(initialConfig) {
         {   // 1 — FLYER / CARTON : même principe, mais on laisse respirer entre
             //     les poses (pas de coupe partagée sur un format qu'on manipule).
             key: "flyer", mode: 0, desc: "desc_dt_flyer",
-            hide: ["pModeOpts", "pPre"],
+            hide: ["pModeOpts"],
             neutralize: function () { shufIn.text = ""; dtClearPre(); },
             setup: function () {
                 dtRepeat(true); dtGaps(5, 5); dtEdge("bleed", 3);
@@ -8541,7 +8595,7 @@ function mainV2(initialConfig) {
             //     La rotation reste offerte : une affiche portrait sur une
             //     feuille paysage se tourne d'un quart, c'est un cas courant.
             key: "poster", mode: 0, desc: "desc_dt_poster",
-            hide: ["pRep", "pGaps", "pModeOpts", "pDupx", "pPre"],
+            hide: ["pRep", "pGaps", "pModeOpts", "pDupx"],
             neutralize: function () {
                 // une seule pose : répétition, tête-bêche et espacement n'ont
                 // aucun sens et ne doivent pas subsister depuis un preset.
@@ -8561,7 +8615,7 @@ function mainV2(initialConfig) {
         {   // 3 — STICKER / ÉTIQUETTE : Step & Repeat, avec le jeu nécessaire
             //     au passage de la lame ou du massicot entre les poses.
             key: "sticker", mode: 1, desc: "desc_dt_sticker",
-            hide: ["pModeOpts", "pDupx", "pPre"],   // onglet Recto/verso vide -> dupNA
+            hide: ["pModeOpts", "pDupx"],   // onglet Recto/verso vide -> dupNA
             neutralize: function () {
                 dupCb.value = false;               // un sticker n'a pas de verso
                 shufIn.text = ""; dtClearPre();
@@ -8585,7 +8639,7 @@ function mainV2(initialConfig) {
             //                   afficher laisserait croire qu'ils agissent.
             key: "zine", mode: 3, desc: "desc_dt_zine",
             hide: ["repRow", "repDesc", "flipAltCb", "rotGrp", "shufGrp",
-                   "rowGapV", "gapAutoRow", "pPre"],
+                   "rowGapV", "gapAutoRow"],
             gutter: true,                          // gapH = gouttière, pas espacement
             neutralize: function () {
                 autoCb.value = true; countIn.enabled = false;
@@ -8623,7 +8677,7 @@ function mainV2(initialConfig) {
         pGaps: pGaps, pEdge: pEdge, pBleed: pBleed, pWM: pWM,
         pPiece: pPiece, pPage: pPage, pCustom2: pCustom2, pStyle: pStyle,
         pColorMarks: pColorMarks,
-        pDupx: pDupx, pPre: pPre,
+        pDupx: pDupx,   // `pPre` n'y figure plus : il est hors interface
         // rangées et contrôles isolés
         repRow: repRow, repDesc: repDesc, fitCb: fitCb, flipAltCb: flipAltCb,
         rotGrp: rotGrp, alignPanel: alignPanel,
@@ -8660,7 +8714,7 @@ function mainV2(initialConfig) {
         try { modeRow.visible = isCustom; modeDesc.visible = isCustom; } catch (eDr) {}
         // onglet Recto/verso entièrement vide -> on dit pourquoi
         try {
-            var dupEmpty = !pDupx.visible && !pPre.visible;
+            var dupEmpty = !pDupx.visible;
             dupNA.visible = dupEmpty;
         } catch (eDn) {}
         // Un panneau dont toutes les rangées sont masquées ne doit pas rester
@@ -9221,8 +9275,6 @@ function iwExecute(doc, c, selItems, custom) {
         colorSwatchSize: cOr("colorSwatchSize", 12),  // côté du carré (haut-gauche)
         colorBarH: cOr("colorBarH", 11),               // hauteur du rectangle (bas-gauche)
         colorBarW: cOr("colorBarW", 46),               // largeur du rectangle (bas-gauche)
-        colorNamePt: cOr("colorNamePt", 8),            // taille du nom de couleur (pt)
-        cornerMult: cOr("cornerMult", 3.2),            // taille des grosses mires de coin
         crossCornerGap: cOr("crossCornerGap", 6)       // marge d'angle des croix de bord (mm)
     };
     try {
