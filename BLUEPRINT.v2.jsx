@@ -6518,7 +6518,11 @@ function mainV2(initialConfig) {
     //  lit ce qui va sortir. On lui donne donc la place, et on ne laisse
     //  autour de lui que ce qui est réellement nécessaire (ligne d'info,
     //  rangées de zoom, résumé) — d'où un « chrome » resserré.
-    var IW_PREVIEW_CHROME = 122;
+    //  V2 — ce qui entoure encore le dessin dans sa colonne se réduit à la
+    //  ligne d'info pièce et à UNE ligne de zoom : le panneau « Résumé » est
+    //  parti dans la barre d'état, et les deux rangées de zoom n'en font plus
+    //  qu'une. Le dessin récupère toute cette hauteur.
+    var IW_PREVIEW_CHROME = 74;
     var IW_CANVAS_H = IW_BODY_H - IW_PREVIEW_CHROME;
     if (IW_CANVAS_H < 300) IW_CANVAS_H = 300;
     // largeur du canvas : ~44% de la largeur écran, bornée
@@ -7941,26 +7945,41 @@ function mainV2(initialConfig) {
         var lo = Math.log(IW_ZOOM_MIN), hi = Math.log(IW_ZOOM_MAX);
         return Math.exp(lo + (v / 1000) * (hi - lo));
     }
-    var zoomGrp = prevPanel.add("group");
-    zoomGrp.orientation = "row"; zoomGrp.alignChildren = "center"; zoomGrp.spacing = 6;
-    zoomGrp.add("statictext", undefined, tr("lbl_zoom"));
-    var zoomMinus = zoomGrp.add("button", undefined, "−"); zoomMinus.preferredSize = [28, 22];
-    var zoomSlider = zoomGrp.add("slider", undefined, zoomToSlider(100), 0, 1000);
-    zoomSlider.preferredSize = [180, 20];
-    var zoomPlus = zoomGrp.add("button", undefined, "+"); zoomPlus.preferredSize = [28, 22];
-    var zoomPct = zoomGrp.add("statictext", undefined, "100%"); zoomPct.preferredSize.width = 48;
+    // ── V2 — UNE SEULE LIGNE DE ZOOM, SOUS LE DESSIN ────────────────────
+    //  Le zoom occupait DEUX rangées (curseur, puis boutons d'ajustement) :
+    //  autant de hauteur en moins pour la feuille, qui est l'objet même de ce
+    //  panneau. Tout tient désormais sur une ligne, et le curseur y prend
+    //  l'espace restant (alignment « fill » horizontal) plutôt qu'une largeur
+    //  fixe : il s'allonge donc avec la fenêtre au lieu de laisser un vide.
+    //  Largeurs ADAPTATIVES : sept contrôles sur une ligne demandent 500 px à
+    //  pleine taille, alors que l'aperçu peut descendre à 360 px sur un petit
+    //  écran — la rangée déborderait et élargirait la fenêtre au-delà de
+    //  l'écran. En dessous de 560 px de dessin, on passe donc à des largeurs
+    //  resserrées ; les infobulles portent le sens si un libellé se serre.
+    var _zWide = (IW_CANVAS_W >= 560);
+    var ZW_FIT  = _zWide ? 74 : 54;
+    var ZW_REAL = _zWide ? 104 : 74;
+    var ZW_RECT = _zWide ? 82 : 62;
+    var ZW_PCT  = _zWide ? 44 : 38;
 
-    // boutons d'ajustement (ligne dédiée pour ne pas serrer le curseur)
-    var zoomBtnRow = prevPanel.add("group");
-    zoomBtnRow.orientation = "row"; zoomBtnRow.alignChildren = "center"; zoomBtnRow.spacing = 6;
-    var zoomFit  = zoomBtnRow.add("button", undefined, tr("btn_zoomfit"));  zoomFit.preferredSize  = [80, 22];
-    var zoomReal = zoomBtnRow.add("button", undefined, tr("btn_zoomreal")); zoomReal.preferredSize = [120, 22];
+    var zoomGrp = prevPanel.add("group");
+    zoomGrp.orientation = "row"; zoomGrp.alignChildren = "center"; zoomGrp.spacing = 4;
+    var zoomMinus = zoomGrp.add("button", undefined, "−"); zoomMinus.preferredSize = [26, 21];
+    // taille VOULUE volontairement petite : c'est « fill » qui donne au
+    // curseur toute la largeur restante, une fois les boutons servis.
+    var zoomSlider = zoomGrp.add("slider", undefined, zoomToSlider(100), 0, 1000);
+    zoomSlider.preferredSize = [50, 20];
+    zoomSlider.alignment = ["fill", "center"];
+    var zoomPlus = zoomGrp.add("button", undefined, "+"); zoomPlus.preferredSize = [26, 21];
+    var zoomPct = zoomGrp.add("statictext", undefined, "100%"); zoomPct.preferredSize.width = ZW_PCT;
+    var zoomFit  = zoomGrp.add("button", undefined, tr("btn_zoomfit"));  zoomFit.preferredSize  = [ZW_FIT, 21];
+    var zoomReal = zoomGrp.add("button", undefined, tr("btn_zoomreal")); zoomReal.preferredSize = [ZW_REAL, 21];
     try { zoomReal.helpTip = tr("tip_zoomreal"); } catch (eZR) {}
     // V2 — RECENTRER : le déplacement de la vue ne pouvait être annulé que par
     //  « Ajuster », qui remettait aussi le zoom à 100 % — on perdait donc son
     //  grossissement pour simplement se recentrer.
-    var zoomRecenter = zoomBtnRow.add("button", undefined, tr("btn_recenter"));
-    zoomRecenter.preferredSize = [90, 22];
+    var zoomRecenter = zoomGrp.add("button", undefined, tr("btn_recenter"));
+    zoomRecenter.preferredSize = [ZW_RECT, 21];
     try { zoomRecenter.helpTip = tr("tip_recenter"); } catch (eRc) {}
     zoomRecenter.onClick = function () { previewPan.x = 0; previewPan.y = 0; refresh(); };
 
@@ -7998,10 +8017,14 @@ function mainV2(initialConfig) {
         applyZoom(zf * 100);
     };
 
-    var sumPanel = rightCol.add("panel", undefined, tr("panel_summary"));
-    sumPanel.alignChildren = "fill"; sumPanel.margins = 6;
-    var summaryTxt = sumPanel.add("statictext", undefined, "", { multiline: true });
-    summaryTxt.preferredSize = [IW_CANVAS_W, 46];
+    // ── V2 — LE PANNEAU « RÉSUMÉ » EST SUPPRIMÉ ─────────────────────────
+    //  Il occupait un bloc de 46 px sous l'aperçu, autant de hauteur en moins
+    //  pour la feuille. Son contenu n'est pas perdu pour autant : la BARRE
+    //  D'ÉTAT, en bas de fenêtre, s'étend désormais sur toute la largeur et le
+    //  reprend intégralement (mode, copies, grille, espacement, encombrement,
+    //  fond perdu). Une seule ligne, un seul endroit où regarder.
+    //  `iwSummaryLine` porte ce texte entre refresh() et updateStatus().
+    var iwSummaryLine = "";
 
     // ── Calcul zone/page pour l'aperçu (page cible courante) ─────────
     function currentZoneAndPage() {
@@ -8114,7 +8137,7 @@ function mainV2(initialConfig) {
         var ctx = currentZoneAndPage();
         var ep = effectivePiece();
         var L = iwComputeLayout(cfg, ep, ctx.zone);
-        summaryTxt.text = iwLayoutSummary(L, cfg);
+        iwSummaryLine = iwLayoutSummary(L, cfg);   // repris par la barre d'état
 
         // info pièce : taille effective (après rotation éventuelle) + angle
         if (hasSel) {
@@ -8137,12 +8160,7 @@ function mainV2(initialConfig) {
             gridRead.text = tr("grid_nofit");
         }
         colsIn.text = String(L.cols); rowsIn.text = String(L.rows);
-        // couleur du résumé selon l'état
-        try {
-            summaryTxt.graphics.foregroundColor = summaryTxt.graphics.newPen(
-                summaryTxt.graphics.PenType.SOLID_COLOR,
-                L.ok ? [0.5, 0.8, 0.55, 1] : [0.9, 0.5, 0.45, 1], 1);
-        } catch (e) {}
+        // (la couleur de l'état est posée par updateStatus, sur la barre d'état)
         // V2 — états conditionnels regroupés : un seul endroit décide de ce qui
         //  est grisé, appelé à chaque rafraîchissement (donc aussi après le
         //  chargement d'un preset, qui les laissait tous actifs).
@@ -8180,7 +8198,11 @@ function mainV2(initialConfig) {
             col = [0.90, 0.45, 0.40, 1];
             runnable = false;
         } else {
-            msg = tr("status_ready", { N: L.count, C: L.cols, R: L.rows });
+            // V2 — la barre reprend le RÉSUMÉ de l'ancien panneau supprimé :
+            //   mode, copies, grille, espacement, encombrement, fond perdu.
+            //   Elle s'étend sur toute la largeur de la fenêtre, elle a donc
+            //   la place que le panneau n'avait pas.
+            msg = iwSummaryLine || tr("status_ready", { N: L.count, C: L.cols, R: L.rows });
             if (IW_MODE_NOTE) msg += "   ·   " + IW_MODE_NOTE;
             col = IW_UI_DARK ? [0.55, 0.80, 0.58, 1] : [0.15, 0.50, 0.25, 1];
             runnable = true;
