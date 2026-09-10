@@ -59,6 +59,22 @@
 //      • Garde-fou d'écran étroit : trois colonnes côte à côte élargissent la
 //        fenêtre ; la colonne des réglages se resserre en premier (jusqu'à
 //        420 px) pour que celle de droite ne sorte pas de l'écran.
+//    Mires : UNE seule taille, et de vrais cercles dans l'aperçu
+//      • Les croix de BORD échappaient au plafond : leur taille était calculée
+//        à part, « longueur × 1,6 » (11,2 mm par défaut), dans le moteur
+//        (addPageSideCrosses) comme dans l'aperçu. D'où des mires de bord bien
+//        plus grosses que celles des coins, sur la même planche. Les neuf
+//        sites de calcul passent désormais tous par iwRegDiam.
+//      • L'aperçu dessinait un CARRÉ en guise de cercle — son propre
+//        commentaire disait « cercle approx en aperçu ». Croix + carré se
+//        lisaient comme une grille de quatre carreaux, sans rapport avec la
+//        croix-dans-un-cercle que le moteur pose réellement. L'aperçu trace
+//        maintenant un vrai cercle (polygonalisé, ScriptUI n'ayant pas d'arc)
+//        avec le plus inscrit dedans, bras de croix = rayon, exactement comme
+//        iwPlaceRegMark.
+//      • `regDiam` n'était pas transmis au moteur : il manquait dans le bloc
+//        d'options d'iwExecute, si bien que le réglage de Réglages ne pilotait
+//        que l'aperçu et que la sortie retombait sur la valeur par défaut.
 //    Mires plafonnées à 4 mm, légende retirée, paramètres morts supprimés
 //      • DIAMÈTRE DES MIRES borné à 4 mm (IW_REG_MAX_MM). La taille était le
 //        produit « longueur de repère × multiplicateur », soit 7 × 2,4 =
@@ -3119,15 +3135,16 @@ function addPageSideCrosses(page, layer, pageBounds, opts) {
     var axisLeft   = l + (m.left   || 0) / 2;
     var axisRight  = r - (m.right  || 0) / 2;
 
-    // taille de la croix+cercle : un peu plus grande qu'avant, mais bornée à
-    // l'épaisseur de marge disponible pour ne pas déborder dans la zone utile.
-    var baseLen = (opts && opts.length != null) ? opts.length : 7;
-    var wantLen = baseLen * 1.6;            // « un peu plus grand »
+    // V2 — taille de la croix+cercle : MÊME diamètre que toutes les autres
+    // mires. Ce site multipliait la longueur de repère par 1,6 (soit 11,2 mm
+    // par défaut) et échappait au plafond : d'où des mires de bord bien plus
+    // grosses que celles des coins, sur la même planche.
+    var wantLen = iwRegDiam(opts && opts.regDiam);
     function clampToMargin(marginThickness) {
         // diamètre du cercle <= ~90% de l'épaisseur de marge
         var maxByMargin = (marginThickness > 0) ? marginThickness * 0.9 : wantLen;
         var L = Math.min(wantLen, maxByMargin);
-        if (L < 3) L = 3;                   // visibilité minimale
+        if (L < 1) L = 1;                   // visibilité minimale
         return L;
     }
 
@@ -5517,11 +5534,26 @@ function iwDrawPreview(canvas, L, zone, pageWH, marks, zoom, pan) {
     var axRightPx = offX + sheetW - mRightPx / 2;
     var pcx = offX + sheetW / 2, pcy = offY + sheetH / 2;
 
-    // mire croix+cercle (aperçu) centrée en (px,py), rayon rad
+    // Mire de calage (aperçu) centrée en (px,py), rayon rad.
+    //   V2 — c'est un CERCLE, pas un carré. L'aperçu traçait un rectangle en
+    //   guise de cercle (« cercle approx en aperçu », disait le commentaire) :
+    //   avec la croix qui le traverse, la mire se lisait comme une grille de
+    //   quatre carreaux, et ne ressemblait pas à ce que le moteur pose
+    //   réellement sur la planche. Le cercle est polygonalisé, comme partout
+    //   ailleurs dans ce fichier — ScriptUI n'a pas d'arc.
+    //   Le PLUS s'arrête AU cercle, sans déborder : c'est exactement ce que
+    //   pose iwPlaceRegMark (bras de croix = rayon du cercle). Un aperçu qui
+    //   déborderait montrerait autre chose que ce qui sera imprimé.
     function pvReg(px, py, rad, pen) {
+        if (!(rad > 0)) return;
         line(px - rad, py, px + rad, py, pen);
         line(px, py - rad, px, py + rad, pen);
-        strokeRect(px - rad, py - rad, rad * 2, rad * 2, pen); // cercle approx en aperçu
+        var pts = iwCirclePoints(px, py, rad, 24);
+        g.newPath();
+        g.moveTo(pts[0][0], pts[0][1]);
+        for (var iC = 1; iC < pts.length; iC++) g.lineTo(pts[iC][0], pts[iC][1]);
+        g.closePath();
+        g.strokePath(pen);
     }
     function radClamp(wantR, marginPx) {
         var maxR = (marginPx > 0 ? marginPx * 0.9 : wantR);
@@ -5570,8 +5602,8 @@ function iwDrawPreview(canvas, L, zone, pageWH, marks, zoom, pan) {
         var sideStepPx = (marks.sideStep && marks.sideStep > 0 ? marks.sideStep : 40) * sc;
         if (sideStepPx >= 6) {
             var pcx2 = offX + sheetW / 2, pcy2 = offY + sheetH / 2;
-            // diamètre ≈ 1.6× la longueur, borné à l'épaisseur de marge
-            var wantR = (marks.len ? marks.len : 7) * 1.6 * sc;
+            // V2 — même diamètre que les autres mires (voir addPageSideCrosses)
+            var wantR = iwRegDiam(marks.regDiam) * sc;
             function radFor(marginPx) {
                 var maxR = (marginPx > 0 ? marginPx * 0.9 : wantR);
                 var R = Math.min(wantR, maxR) / 2;
@@ -9275,7 +9307,11 @@ function iwExecute(doc, c, selItems, custom) {
         colorSwatchSize: cOr("colorSwatchSize", 12),  // côté du carré (haut-gauche)
         colorBarH: cOr("colorBarH", 11),               // hauteur du rectangle (bas-gauche)
         colorBarW: cOr("colorBarW", 46),               // largeur du rectangle (bas-gauche)
-        crossCornerGap: cOr("crossCornerGap", 6)       // marge d'angle des croix de bord (mm)
+        crossCornerGap: cOr("crossCornerGap", 6),      // marge d'angle des croix de bord (mm)
+        // V2 — diamètre des mires (mm), plafonné par iwRegDiam. Sans cette
+        // ligne le moteur ne recevait pas le réglage et retombait sur la
+        // valeur par défaut, quel que soit le choix fait dans Réglages.
+        regDiam: iwRegDiam(cOr("regDiam", IW_REG_MAX_MM))
     };
     try {
         for (var i = 0; i < placed.length; i++)
